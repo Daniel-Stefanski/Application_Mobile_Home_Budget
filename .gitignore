@@ -13,3 +13,33 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# --- Local databases ---
+*.db
+*.db-shm
+*.db-wal
+*.db.lck
+
+# --- Local preferences ---
+*prefs.json
+
+# --- IDE ---
+.idea/
+*.iml
+
+# --- Build ---
+/build/
+**/build/
+
+# --- Logs ---
+*.log
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Kotlin cache ---
+.kotlin/
+
+# --- Gradle ---
+.gradle/

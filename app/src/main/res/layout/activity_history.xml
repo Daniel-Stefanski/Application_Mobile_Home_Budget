@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="?android:colorBackground">
+<!--activity_history.xml – układ historii wydatków (lista, wyszukiwanie, sortowanie).-->
+
+    <!--Tytuł-->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Historia Wydatków"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="?android:textColorPrimary"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <!--Przycisk powrotu do ekranu głównego-->
+    <Button
+        android:id="@+id/buttonBackToMain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Powrót do ekranu głównego"
+        android:textColor="@color/buttonText"
+        android:backgroundTint="@color/buttonBackground"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Pasek wyszukiwania -->
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/searchView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:queryHint="Szukaj wydatku po opisie lub notatce..."
+        android:iconifiedByDefault="false"
+        android:background ="@drawable/shape_search_border"
+        android:padding="8dp"
+        android:layout_marginBottom="8dp"/>
+
+    <!--Etykieta + Spinner do sortowania-->
+    <TextView
+        android:id="@+id/textSortLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sortowanie:"
+        android:textStyle="bold"
+        android:textColor="?android:textColorPrimary"
+        android:layout_marginBottom="4dp"/>
+    <Spinner
+        android:id="@+id/spinnerSort"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/shape_search_border"
+        android:entries="@array/sort_options"
+        android:padding="8dp"
+        android:layout_marginBottom="8dp"/>
+
+    <!--Przycisk do otwierania filtra zaawansowanego-->
+    <Button
+        android:id="@+id/buttonAdvancedFilter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Filtr zaawansowany"
+        android:textColor="@color/buttonText"
+        android:backgroundTint="@color/buttonBackground"
+        android:layout_marginBottom="12dp"/>
+
+    <!--Kominukat dla pustej listy-->
+    <TextView
+        android:id="@+id/textEmptyState"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📝 Brak wydatków w historii.\nDodaj pierwszy wydatek."
+        android:textSize="18sp"
+        android:textColor="?android:textColorPrimary"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="gone"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerExpenses"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Lista wydatków"/>
+
+</LinearLayout>

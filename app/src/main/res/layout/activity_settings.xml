@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+<!--activity_settings.xml – układ ustawień użytkownika.-->
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!--Nagłówek-->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ustawienia aplikacji"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!--Sekcja Konto-->
+        <include
+            android:id="@+id/headerAccount"
+            layout="@layout/item_settings_header"/>
+        <LinearLayout
+            android:id="@+id/sectionAccount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <!-- Imię -->
+            <EditText
+                android:id="@+id/editTextName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/shape_search_border"
+                android:hint="Imię lub Nick"
+                android:inputType="textPersonName"
+                android:padding="12dp" />
+
+            <!-- Email -->
+            <EditText
+                android:id="@+id/editTextEmail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/shape_search_border"
+                android:hint="Email"
+                android:inputType="textEmailAddress"
+                android:padding="12dp" />
+
+            <!-- Stare hasło -->
+            <EditText
+                android:id="@+id/editTextOldPassword"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/shape_search_border"
+                android:hint="Stare hasło"
+                android:inputType="textPassword"
+                android:padding="12dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+                <!-- Nowe hasło -->
+                <EditText
+                    android:id="@+id/editTextNewPassword"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/shape_search_border"
+                    android:hint="Nowe hasło"
+                    android:inputType="textPassword"
+                    android:padding="12dp"/>
+                <!--Info o wymaganiach hasła-->
+                <ImageView
+                    android:id="@+id/imagePasswordInfoSettings"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="8dp"
+                    android:src="@drawable/ic_info"
+                    android:contentDescription="Wymagania hasła"
+                    app:tint="#1976D2"/>
+            </LinearLayout>
+
+            <!--Pokaż/ukryj hasło-->
+            <CheckBox
+                android:id="@+id/checkboxShowPasswordSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:text="Pokaż/Ukryj hasła"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/textCreatedAt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:text="Data utworzenia konta: "
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/textLastLogin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:text="Ostatnie logowanie: "
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/buttonSaveAccountChanges"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/buttonBackground"
+                android:text="Zapisz zmiany"
+                android:textColor="@color/buttonText" />
+
+            <Button
+                android:id="@+id/buttonDeleteAccount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/buttonDangerBackground"
+                android:text="Usuń konto"
+                android:textColor="@color/buttonDangerText" />
+        </LinearLayout>
+
+        <!--Sekcja Kategorie-->
+        <include
+            android:id="@+id/headerCategories"
+            layout="@layout/item_settings_header"/>
+
+        <LinearLayout
+            android:id="@+id/sectionCategories"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Tutaj użytkownik będzie mógł edytować lub dodać kategorie"
+                android:padding="4dp"/>
+        </LinearLayout>
+
+        <!--Sekcja Fikcyjnych osoby-->
+        <include
+            android:id="@+id/headerPeople"
+            layout="@layout/item_settings_header"/>
+        <LinearLayout
+            android:id="@+id/sectionPeople"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Tutaj pojawi się lista fikcyjnych osób"
+                android:padding="4dp"/>
+        </LinearLayout>
+
+        <!--Sekcja Motyw-->
+        <include
+            android:id="@+id/headerTheme"
+            layout="@layout/item_settings_header"/>
+
+        <LinearLayout
+            android:id="@+id/sectionTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <!-- Tryb jasny -->
+            <LinearLayout
+                android:id="@+id/rowLight"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:background="@drawable/shape_search_border"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <RadioButton
+                    android:id="@+id/radioLight"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="☀️"
+                    android:textSize="20sp"
+                    android:layout_marginStart="12dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tryb jasny"
+                    android:textSize="16sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- Tryb ciemny -->
+            <LinearLayout
+                android:id="@+id/rowDark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:background="@drawable/shape_search_border"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <RadioButton
+                    android:id="@+id/radioDark"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌙️"
+                    android:textSize="20sp"
+                    android:layout_marginStart="12dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tryb ciemny"
+                    android:textSize="16sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- Tryb systemowy -->
+            <LinearLayout
+                android:id="@+id/rowSystem"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:background="@drawable/shape_search_border"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <RadioButton
+                    android:id="@+id/radioSystem"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚙️"
+                    android:textSize="20sp"
+                    android:layout_marginStart="12dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Automatyczny (zgodny z systemem)"
+                    android:textSize="16sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!--Sekcja preferecji-->
+        <include
+            android:id="@+id/headerPreferences"
+            layout="@layout/item_settings_header"/>
+        <LinearLayout
+            android:id="@+id/sectionPreferences"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:visibility="gone">
+            <!--Powiadomienia-->
+            <CheckBox
+                android:id="@+id/checkboxNotifications"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Powiadomienia systemowe"
+                android:textSize="14sp"
+                android:layout_marginBottom="6dp"/>
+            <!--Domyślna kategoria-->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Domyślna kategoria"
+                android:textSize="14sp"/>
+            <Spinner
+                android:id="@+id/spinnerDefaultCategory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/shape_search_border"/>
+            <!--Domyślna metoda płatności-->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Domyślna metoda płatności"
+                android:textSize="14sp"/>
+            <Spinner
+                android:id="@+id/spinnerDefaultPayment"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/shape_search_border"/>
+            <!--Przycisk od resetu danych w bazie danych-->
+            <Button
+                android:id="@+id/buttonResetData"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Reset danych"
+                android:textColor="@color/buttonText"
+                android:backgroundTint="@color/buttonBackground"
+                android:layout_marginTop="24dp"/>
+        </LinearLayout>
+
+        <!--Przycisk od powrotu do ekranu głównego-->
+        <Button
+            android:id="@+id/buttonBackToMain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Powrót do ekranu głównego"
+            android:textColor="@color/buttonText"
+            android:backgroundTint="@color/buttonBackground"
+            android:layout_marginTop="12dp" />
+
+        <!--Przycisk do wylogowywania-->
+        <Button
+            android:id="@+id/buttonLogout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Wyloguj się"
+            android:textColor="@color/buttonDangerText"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/buttonDangerBackground"/>
+    </LinearLayout>
+</ScrollView>

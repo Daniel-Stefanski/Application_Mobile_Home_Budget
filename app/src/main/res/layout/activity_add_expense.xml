@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="?android:colorBackground">
+<!--activity_add_expense.xml – układ ekranu dodawania wydatku.-->
+
+    <LinearLayout
+        android:id="@+id/main_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingBottom="24dp">
+
+        <!--Nagłówek-->
+        <TextView
+            android:id="@+id/textTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dodaj wydatek"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Opis -->
+        <TextView
+            android:id="@+id/labelDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏷️ Opis"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/inputDescription"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Np. zakupy w sklepie"
+            android:inputType="text"
+            android:background="@drawable/shape_search_border"
+            android:padding="10dp"
+            android:imeOptions="actionNext"/>
+
+        <!-- Kwota -->
+        <TextView
+            android:id="@+id/labelAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💵 Kwota"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/inputAmount"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Wprowadź kwotę"
+            android:inputType="textVisiblePassword"
+            android:background="@drawable/shape_search_border"
+            android:padding="10dp"
+            android:imeOptions="actionNext"/>
+
+        <!-- Notatka -->
+        <TextView
+            android:id="@+id/labelNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📝 Notatka"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/inputNote"
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:hint="Dodatkowe informacje (opcjonalnie)"
+            android:inputType="textMultiLine"
+            android:gravity="top"
+            android:background="@drawable/shape_search_border"
+            android:padding="10dp"
+            android:imeOptions="actionDone"/>
+
+        <!-- Kategoria -->
+        <TextView
+            android:id="@+id/labelCategory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📂 Kategoria"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <Spinner
+            android:id="@+id/spinnerCategory"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/shape_search_border"
+            android:padding="6dp"/>
+
+        <!-- Metoda płatności -->
+        <TextView
+            android:id="@+id/labelPayment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💳 Metoda płatności"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <Spinner
+            android:id="@+id/spinnerPayment"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/shape_search_border"
+            android:padding="6dp"/>
+
+        <!--Wybór czyj wydatek-->
+        <TextView
+            android:id="@+id/labelPerson"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="👤 Osoba"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <Spinner
+            android:id="@+id/spinnerPerson"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/shape_search_border"
+            android:padding="6dp"/>
+
+        <!-- Data -->
+        <TextView
+            android:id="@+id/labelDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📅 Data"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <Button
+            android:id="@+id/btnDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Wybierz datę"
+            android:textColor="@color/buttonText"
+            android:backgroundTint="@color/buttonBackground"
+            android:elevation="2dp"/>
+
+        <!--Powtarzalny wydatek-->
+        <CheckBox
+            android:id="@+id/checkboxRecurring"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔁 Dodaj do Planer Rachunków"
+            android:textSize="16sp"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="12dp"/>
+
+        <!--Wybór cyklu powtarzania (ukryty domyślnie)-->
+        <LinearLayout
+            android:id="@+id/layoutCycle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Powtarzaj co:"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"/>
+            <Spinner
+                android:id="@+id/spinnerCycle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/shape_search_border"
+                android:padding="6dp"/>
+
+        </LinearLayout>
+
+        <!-- Przyciski -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="20dp">
+
+            <Button
+                android:id="@+id/btnCancel"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="❌ Anuluj"
+                android:textColor="@color/buttonText"
+                android:backgroundTint="@color/buttonBackground"
+                android:elevation="4dp"/>
+
+            <Space
+                android:layout_width="12dp"
+                android:layout_height="wrap_content"/>
+
+            <Button
+                android:id="@+id/btnSave"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="💾 Zapisz"
+                android:textColor="@color/buttonText"
+                android:backgroundTint="@color/buttonBackground"
+                android:elevation="4dp"
+                android:enabled="false"/>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

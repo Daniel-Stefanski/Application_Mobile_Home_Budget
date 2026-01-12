@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="20dp"
+    android:background="@color/dialogBackground">
+<!--dialog_add_category.xml – okno dialogowe do dodania nowej kategorii wydatku.-->
+
+    <View
+        android:id="@+id/colorPreview"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="16dp"
+        android:background="#FF5722"
+        android:layout_gravity="center_vertical" />
+
+    <EditText
+        android:id="@+id/inputCategoryName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:hint="Nazwa kategorii"
+        android:textColor="@color/dialogText"
+        android:textColorHint="@color/dialogHint"
+        android:background="@drawable/shape_search_border"
+        android:padding="12dp"
+        android:inputType="textCapWords"/>
+
+</LinearLayout>

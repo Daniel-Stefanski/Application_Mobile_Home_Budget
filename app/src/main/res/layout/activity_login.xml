@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp"
+    android:gravity="center">
+<!--activity_login.xml – układ ekranu logowania.-->
+    <!--Logo aplikacji-->
+    <ImageView
+        android:id="@+id/imageLogo"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/img_logo_budzetu"
+        android:contentDescription="Logo aplikacji HomeBudget"
+        android:layout_marginBottom="16dp"/>
+
+    <!--Tytuł-->
+    <TextView
+        android:id="@+id/textTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Zaloguj się"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textColor="?android:textColorPrimary"
+        android:layout_marginBottom="30dp"/>
+
+    <!--Login/Email-->
+    <EditText
+        android:id="@+id/editTextEmail"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:hint="Email"
+        android:background="@drawable/shape_search_border"
+        android:inputType="textEmailAddress"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"/>
+
+    <!--Hasło-->
+    <EditText
+        android:id="@+id/editTextPassword"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:hint="Hasło"
+        android:background="@drawable/shape_search_border"
+        android:inputType="textPassword"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"/>
+
+    <!--Komunikat błędu logowania-->
+    <TextView
+        android:id="@+id/textLoginError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Nieprawidłowy email lub hasło"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="14sp"
+        android:visibility="gone"
+        android:layout_marginBottom="12dp"
+        android:gravity="center"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="16dp">
+
+        <!--Pokaż/Ukryj hasło-->
+        <CheckBox
+            android:id="@+id/checkboxShowPassword"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pokaż/Ukryj hasło"
+            android:layout_marginEnd="20dp"/>
+
+        <!--Zapamiętywanie użytkownika gdzie nie musimy się ponownie logowac - automatyczne-->
+        <CheckBox
+            android:id="@+id/checkBoxRememberMe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zapamiętaj mnie"/>
+    </LinearLayout>
+
+    <!--Przycisk logowania-->
+    <Button
+        android:id="@+id/buttonLogin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Zaloguj się"
+        android:textColor="@color/buttonPrimaryText"
+        android:backgroundTint="@color/buttonPrimaryBackground"
+        android:layout_marginBottom="16dp"/>
+
+    <!--Link do przejścia do ekranu rejestracji-->
+    <TextView
+        android:id="@+id/textRegister"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nie masz konta? Zarejestruj się"
+        android:textColor="#1976D2"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:paddingVertical="14dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+    <!--Link do przejścia do ekranu resetu hasła-->
+    <TextView
+        android:id="@+id/textForgotPassword"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nie pamiętasz hasła? Zresetuj je"
+        android:textColor="#1976D2"
+        android:textStyle="bold"
+        android:paddingVertical="14dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+</LinearLayout>

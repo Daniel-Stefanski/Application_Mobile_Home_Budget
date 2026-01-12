@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="13dp"
+    app:cardElevation="4dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#A694F9"
+    android:backgroundTint="#2C2C2C">
+    <!--item_saving_goal.xml – pojedynczy element listy celów oszczędnościowych.-->
+
+    <!-- Wewnętrzny układ, żeby elementy były czytelne -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/textTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cel: "
+            android:textStyle="bold"
+            android:textColor="#C8BFFF"
+            android:layout_marginTop="2dp"/>
+
+        <TextView
+            android:id="@+id/textTarget"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Kwota docelowa: "
+            android:textColor="#EAEAEA"
+            android:layout_marginTop="2dp"/>
+
+        <TextView
+            android:id="@+id/textSaved"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zaoszczędzono: "
+            android:textColor="#EAEAEA"
+            android:layout_marginTop="2dp"/>
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:progress="0"
+            android:max="100"
+            android:progressTint="@android:color/holo_green_light"
+            android:layout_marginTop="8dp"/>
+
+        <TextView
+            android:id="@+id/textProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Postęp: 0%"
+            android:textColor="#EAEAEA"
+            android:layout_marginTop="4dp"/>
+
+        <TextView
+            android:id="@+id/textSharedWith"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Z kim: Tylko ja"
+            android:textColor="#EAEAEA"
+            android:layout_marginTop="4dp"/>
+
+        <TextView
+            android:id="@+id/textDaysLeft"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bez terminu"
+            android:textColor="#EAEAEA"
+            android:layout_marginTop="2dp"
+            android:lineSpacingExtra="5dp"/>
+
+        <!--Sekcja przycisków-->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:gravity="center_horizontal">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:weightSum="3"
+                android:layout_marginBottom="4dp">
+                <!--Przycisk dodawania kwoty do oszczędności-->
+                <Button
+                    android:id="@+id/buttonAddAmount"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="💵 Dodaj"
+                    android:textSize="12sp"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:layout_marginEnd="6dp"/>
+                <!--Przycisk wypłaty kwoty z oszczędności-->
+                <Button
+                    android:id="@+id/buttonWithdraw"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="💵 Wypłać"
+                    android:textSize="12sp"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:layout_marginEnd="6dp"/>
+                <!--Przycisk edytowania danej oszczędności-->
+                <Button
+                    android:id="@+id/buttonEditGoal"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="✏️ Edytuj"
+                    android:textSize="12sp"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:weightSum="2">
+                <!--Przycisk do historii wpłat do danego celu-->
+                <Button
+                    android:id="@+id/buttonViewContributions"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="📜 Historia"
+                    android:textSize="12sp"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:layout_marginStart="6dp"/>
+                <!--Przycisk usuwania celu oszczędnościowego-->
+                <Button
+                    android:id="@+id/buttonDeleteGoal"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="🗑️ Usuń"
+                    android:textSize="12sp"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:layout_marginEnd="6dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

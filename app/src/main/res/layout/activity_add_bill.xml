@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="?android:colorBackground">
+
+<!--activity_add_bill.xml – układ ekranu dodawania rachunku.-->
+    <LinearLayout
+        android:id="@+id/main_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingBottom="24dp">
+
+        <!--Nagłówek-->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dodaj rachunek"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"/>
+
+        <!--Opis-->
+        <TextView
+            android:id="@+id/labelDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏷️ Opis"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/inputDescription"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Np. czynsz, prąd, internet"
+            android:inputType="text"
+            android:background="@drawable/shape_search_border"
+            android:padding="10dp"
+            android:imeOptions="actionNext"
+            android:layout_marginBottom="8dp"/>
+
+        <!--Kwota-->
+        <TextView
+            android:id="@+id/labelAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💰 Kwota"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/inputAmount"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Wprowadź kwotę"
+            android:inputType="numberDecimal"
+            android:background="@drawable/shape_search_border"
+            android:padding="10dp"
+            android:imeOptions="actionNext"
+            android:layout_marginBottom="8dp"/>
+
+        <!--Notatka-->
+        <TextView
+            android:id="@+id/labelNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📝 Notatka (opcjonalna)"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/inputNote"
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:hint="Np. termin płatności, dane do przelewu..."
+            android:inputType="textMultiLine"
+            android:gravity="top"
+            android:background="@drawable/shape_search_border"
+            android:padding="10dp"
+            android:imeOptions="actionDone"
+            android:layout_marginBottom="8dp"/>
+
+        <!--Data-->
+        <TextView
+            android:id="@+id/labelDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📅 Termin płatności"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="8dp"/>
+        <TextView
+            android:id="@+id/textSelectedDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Wybrana data:"
+            android:layout_marginBottom="8dp"/>
+        <Button
+            android:id="@+id/buttonSelectDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Wybierz datę"
+            android:textColor="@color/buttonText"
+            android:backgroundTint="@color/buttonBackground"
+            android:elevation="2dp"/>
+
+        <!--Powtarzanie rachunku-->
+        <TextView
+            android:id="@+id/labelRecurring"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔁 Powtarzanie rachunku"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="12dp"/>
+        <Spinner
+            android:id="@+id/spinnerInterval"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/shape_search_border"
+            android:padding="6dp"
+            android:layout_marginBottom="8dp"/>
+
+        <!--Checkbox od czy rachunek jest opłacony-->
+        <CheckBox
+            android:id="@+id/checkboxMarkPaid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="✅ Oznacz jako opłacony przy dodaniu"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginTop="4dp"/>
+
+        <!--Przyciski-->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="16dp">
+
+            <Button
+                android:id="@+id/buttonCancel"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="❌ Anuluj"
+                android:textColor="@color/buttonText"
+                android:backgroundTint="@color/buttonBackground"
+                android:elevation="4dp"/>
+
+            <Space
+                android:layout_width="12dp"
+                android:layout_height="wrap_content"/>
+
+            <Button
+                android:id="@+id/buttonSaveBill"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="💾 Zapisz"
+                android:textColor="@color/buttonText"
+                android:backgroundTint="@color/buttonBackground"
+                android:elevation="4dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="?android:colorBackground">
+<!--activity_savings.xml – układ ekranu oszczędności.-->
+
+    <!--Nagłówek-->
+    <TextView
+        android:id="@+id/textTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Cele Oszczędnościowe"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="?android:textColorPrimary"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"
+        android:paddingTop="8dp"/>
+
+    <!--Przycisk powrotu do ekranu głównego-->
+    <Button
+        android:id="@+id/buttonBackToMain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Powrót do ekranu głównego"
+        android:textColor="@color/buttonText"
+        android:backgroundTint="@color/buttonBackground"
+        android:layout_marginBottom="12dp"
+        android:elevation="2dp"/>
+
+    <!--Przycisk dodaj cel oszczędnośiowy-->
+    <Button
+        android:id="@+id/buttonAddGoal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="➕ Dodaj cel oszczędnościowy"
+        android:textColor="@color/buttonText"
+        android:backgroundTint="@color/buttonBackground"
+        android:layout_marginBottom="16dp"
+        android:elevation="2dp"/>
+
+    <!--Kominukat dla pustej listy-->
+    <TextView
+        android:id="@+id/textEmptySaving"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📝 Brak celów oszczędnościowych.\nKliknij ➕, aby dodać pierwszy cel."
+        android:textSize="18sp"
+        android:textColor="?android:textColorPrimary"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="gone"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"/>
+
+    <!-- RecyclerView z listą celów -->
+    <androidx.recyclerview.widget.RecyclerView
+    android:id="@+id/recyclerGoals"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:clipToPadding="false"
+    android:paddingBottom="8dp"
+    android:contentDescription="Lista celów oszczędnościowych"/>
+</LinearLayout>

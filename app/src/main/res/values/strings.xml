@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Home Budget</string>
+
+    <string-array name="sort_options">
+        <item>Od najnowszych</item>
+        <item>Od najstarszych</item>
+        <item>Kwota: rosnąco</item>
+        <item>Kwota: malejąco</item>
+    </string-array>
+</resources>

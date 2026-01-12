@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+    
+<!--activity_bills_planner.xml – układ planera rachunków.-->
+    <TextView
+        android:id="@+id/titleBills"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Planer rachunków"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="?android:textColorPrimary"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"
+        android:padding="8dp"/>
+
+    <!--Przycisk powrotu do ekranu głównego-->
+    <Button
+        android:id="@+id/buttonBackToMain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Powrót do ekranu głównego"
+        android:textColor="@color/buttonText"
+        android:backgroundTint="@color/buttonBackground"
+        android:layout_marginBottom="12dp"/>
+
+    <!--Przycisk dodaj rachunek-->
+    <Button
+        android:id="@+id/buttonAddBill"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Dodaj rachunek"
+        android:textColor="@color/buttonText"
+        android:backgroundTint="@color/buttonBackground"/>
+
+    <!--Podsumowanie ile mamy rachunków oraz sumowana kwota-->
+    <include
+        android:id="@+id/includeBillsSummary"
+        layout="@layout/item_bills_summary"/>
+
+    <!--Etykieta + Spinner do sortowania-->
+    <TextView
+        android:id="@+id/textSortLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sortowanie:"
+        android:textStyle="bold"
+        android:textColor="?android:textColorPrimary"
+        android:layout_marginBottom="4dp"
+        android:layout_marginTop="8dp"/>
+    <Spinner
+        android:id="@+id/spinnerSortBills"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/shape_search_border"
+        android:padding="6dp"
+        android:layout_marginBottom="8dp"/>
+
+    <!--Komunikat dla pustej listy-->
+    <TextView
+        android:id="@+id/textEmptyPlanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📝 Brak rachunków w planarze.\nKliknij ➕, aby dodać pierwszy rachunek."
+        android:textSize="18sp"
+        android:textColor="?android:textColorPrimary"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="gone"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerBills"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:contentDescription="Lista rachunków"/>
+
+</LinearLayout>

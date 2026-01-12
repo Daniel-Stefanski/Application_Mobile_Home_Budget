@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#2C2C2C"
+    android:padding="8dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="4dp"
+    android:orientation="horizontal"
+    android:elevation="2dp"
+    android:backgroundTintMode="src_over"
+    android:backgroundTint="#333333"
+    android:clipToPadding="false"
+    android:layout_marginHorizontal="8dp"
+    android:gravity="center_vertical">
+    <!--item_date_header.xml (night)– służy do grupowania wydatkó po dacie. Wersja dla ciemnego motywu.-->
+
+    <TextView
+        android:id="@+id/textHeaderDate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="06.10.2025"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:textColor="#EAEAEA"
+        android:padding="4dp"/>
+
+</LinearLayout>

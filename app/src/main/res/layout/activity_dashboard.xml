@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="?android:colorBackground">
+<!--activity_dashboard.xml – układ głównego ekranu (panel nawigacyjny).-->
+
+    <!-- Główne ułożenie: kolumny i padding -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!--Powitanie użytkownika-->
+        <TextView
+            android:id="@+id/textWelcome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Witaj!"
+            android:textAlignment="center"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:paddingBottom="8dp"/>
+
+        <!--Nowy nagłówek z miesiącem i rokiem i przyciskami zmieny-->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_marginBottom="12dp">
+
+            <ImageButton
+                android:id="@+id/buttonPrevMonth"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_left"
+                android:contentDescription="Poprzedni miesiąc"
+                android:layout_marginEnd="8dp"/>
+            <TextView
+                android:id="@+id/textMonthYear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Miesiąc Rok"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"/>
+            <ImageButton
+                android:id="@+id/buttonNextMonth"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_right"
+                android:contentDescription="Następny miesiąc"
+                android:layout_marginStart="8dp"/>
+
+        </LinearLayout>
+
+        <!--PieChart Wykres kołowy-->
+        <com.github.mikephil.charting.charts.PieChart
+            android:id="@+id/pieChart"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:layout_marginBottom="12dp"/>
+
+        <!--Centrum: podsumowanie(tekst)-->
+        <LinearLayout
+            android:id="@+id/summaryCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="2dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_summary_card">
+            <TextView
+                android:id="@+id/textSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Budżet: 0 zł - Wydano: 0 zł"
+                android:textAlignment="center"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"
+                android:shadowColor="#80000000"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="2"
+                android:paddingBottom="16dp"
+                android:paddingTop="8dp"/>
+        </LinearLayout>
+
+        <!--Kontener dla legendy / listy kategorii-->
+        <LinearLayout
+            android:id="@+id/categoriesContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"/>
+
+        <!--Sekcja przycisków-->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:gravity="center_horizontal">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="4dp"
+                android:weightSum="2">
+                <!--Przycisk dodaj budżet-->
+                <Button
+                    android:id="@+id/buttonSetBudget"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="💰 Ustaw budżet"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp"/>
+                <!--Przycisk przejścia do formularza wydatków-->
+                <Button
+                    android:id="@+id/buttonAddExpense"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="➕ Dodaj wydatek"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="4dp"
+                android:weightSum="2">
+                <!--Przycisk przejścia do historii wydatków-->
+                <Button
+                    android:id="@+id/buttonHistory"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="📜 Historia wydatków"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp"/>
+                <!--Przycisk przejścia do oszczędności-->
+                <Button
+                    android:id="@+id/buttonSavings"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="🏦 Cele oszczędnościowe"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="4dp"
+                android:weightSum="2">
+                <!--Przycisk przejścia do planera rachunków-->
+                <Button
+                    android:id="@+id/buttonBillsPlanner"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="📅 Planer rachunków"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp"/>
+                <!--Przycisk przejścia do statystyk-->
+                <Button
+                    android:id="@+id/buttonStatistics"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="📊 Statystyki"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="4dp"
+                android:weightSum="1">
+                <!--Przycisk przejścia do ustawień-->
+                <Button
+                    android:id="@+id/buttonSettings"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:text="⚙️ Ustawienia"
+                    android:textColor="@color/buttonText"
+                    android:backgroundTint="@color/buttonBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

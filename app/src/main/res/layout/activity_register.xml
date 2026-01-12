@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp">
+<!--activity_register.xml – układ ekranu rejestracji.-->
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <!--Tytuł-->
+        <TextView
+            android:id="@+id/textTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Zarejestruj się"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginBottom="30dp"/>
+
+        <!--Imię-->
+        <EditText
+            android:id="@+id/editTextName"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Imię/Nick (opcjonalnie)"
+            android:background="@drawable/shape_search_border"
+            android:inputType="textPersonName"
+            android:maxLength="20"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"/>
+
+        <!--Email-->
+        <EditText
+            android:id="@+id/editTextEmail"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Email"
+            android:background="@drawable/shape_search_border"
+            android:inputType="textEmailAddress"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+            <!--Hasło-->
+            <EditText
+                android:id="@+id/editTextPassword"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:hint="Hasło"
+                android:background="@drawable/shape_search_border"
+                android:inputType="textPassword"
+                android:padding="12dp"
+                android:importantForAutofill="no"/>
+            <!--Wymagania hasła-->
+            <ImageView
+                android:id="@+id/imagePasswordInfo"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="8dp"
+                android:src="@drawable/ic_info"
+                app:tint="#1976D2"
+                android:contentDescription="Wymagania hasła"/>
+        </LinearLayout>
+        <!--Powtórz hasło-->
+        <EditText
+            android:id="@+id/editTextConfirmPassword"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Powtórz hasło"
+            android:background="@drawable/shape_search_border"
+            android:inputType="textPassword"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"
+            android:importantForAutofill="no"/>
+
+        <!--Pokaż hasła-->
+        <CheckBox
+            android:id="@+id/checkboxShowPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pokaż/Ukryj hasło"/>
+
+        <!--Akceptacja regulaminu-->
+        <CheckBox
+            android:id="@+id/checkBoxTerms"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Akceptuję Regulamin"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:padding="4dp"/>
+
+        <!-- Komunikat błędu regulaminu -->
+        <TextView
+            android:id="@+id/textTermsError"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Musisz zaakceptować regulamin"
+            android:textSize="13sp"
+            android:textColor="@android:color/holo_red_dark"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <!--Przycisk rejestracja-->
+        <Button
+            android:id="@+id/buttonRegister"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Zarejestruj się"
+            android:textColor="@color/buttonPrimaryText"
+            android:backgroundTint="@color/buttonPrimaryBackground"
+            android:layout_marginBottom="16dp"/>
+
+        <!--Loader-->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_marginTop="16dp"/>
+
+        <!--Link do przejścia do ekranu logowania-->
+        <TextView
+            android:id="@+id/textLogin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Masz już konto? Zaloguj się"
+            android:textColor="#1976D2"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:paddingVertical="14dp"
+            android:clickable="true"
+            android:focusable="true"/>
+
+    </LinearLayout>
+
+</ScrollView>

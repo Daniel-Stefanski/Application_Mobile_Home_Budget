@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:autoMirrored="true"
+    android:height="36dp"
+    android:width="36dp"
+    android:viewportHeight="24"
+    android:viewportWidth="24"
+    android:tint="#D0B6F0">
+    <!-- ic_arrow_left.xml - Plik służy do utworzenia ikonki skrzałki do wykorzystania przełączania się miedzy miesiacami.-->
+
+    <path android:fillColor="@android:color/white"
+        android:pathData="M15,6l-6,6 6,6V6z"/>
+    
+</vector>

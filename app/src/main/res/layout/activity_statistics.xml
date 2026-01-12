@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:colorBackground"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!--Nagłówek-->
+        <TextView
+            android:id="@+id/textTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Statystyki"
+            android:textSize="20sp"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:layout_marginStart="8dp"/>
+
+        <!--Wybór roku-->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingBottom="16dp">
+            <ImageButton
+                android:id="@+id/buttonPrevYear"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_left"
+                android:contentDescription="Poprzedni rok"
+                android:layout_marginEnd="8dp"/>
+            <TextView
+                android:id="@+id/textYear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2025"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:textColor="?android:textColorPrimary"
+                android:layout_marginHorizontal="8dp"/>
+            <ImageButton
+                android:id="@+id/buttonNextYear"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_right"
+                android:contentDescription="Następny rok"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!--Kafel podsumowania roku-->
+        <TextView
+            android:id="@+id/textYearTotal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp"/>
+        <TextView
+            android:id="@+id/textYearBudget"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp"/>
+        <TextView
+            android:id="@+id/textYearSavings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp"/>
+
+        <!--Informacja o kliknięciu w miesiac-->
+        <TextView
+            android:id="@+id/textHintClickMonth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Kliknij w miesiąc na wykresie, aby zobaczyć szczegóły"
+            android:textSize="13sp"
+            android:textColor="#888888"
+            android:gravity="center"
+            android:layout_marginTop="8dp"
+            android:padding="4dp"/>
+
+        <!--Wykres słupkowy-->
+        <com.github.mikephil.charting.charts.BarChart
+            android:id="@+id/barChartStats"
+            android:layout_width="match_parent"
+            android:layout_height="350dp"
+            android:layout_marginBottom="12dp"/>
+
+        <!--Panel rozwijany dla szczegółów miesiąca-->
+        <LinearLayout
+            android:id="@+id/monthDetailsPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:background="?android:colorBackground"
+            android:visibility="gone"
+            android:elevation="4dp"
+            android:layout_marginTop="8dp">
+            <TextView
+                android:id="@+id/textMonthTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_gravity="center"
+                android:layout_marginTop="4dp"/>
+            <TextView
+                android:id="@+id/textMonthSpent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:layout_marginTop="4dp"/>
+            <TextView
+                android:id="@+id/textMonthBudget"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:layout_marginTop="4dp"/>
+            <TextView
+                android:id="@+id/textMonthResult"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:layout_marginTop="4dp"/>
+            <TextView
+                android:id="@+id/textMonthCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:layout_marginTop="4dp"/>
+            <TextView
+                android:id="@+id/textMonthMin"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:layout_marginTop="4dp"/>
+            <TextView
+                android:id="@+id/textMonthMax"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:layout_marginTop="4dp"/>
+            <Button
+                android:id="@+id/buttonShowMonthDetails"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pokaż szczegółowo miesiąc"
+                android:textColor="@color/buttonText"
+                android:backgroundTint="@color/buttonBackground"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"/>
+            <TextView
+                android:id="@+id/textCategoryChartTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Wydatki według kategorii"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"
+                android:layout_gravity="center"
+                android:layout_marginTop="25dp"
+                android:visibility="gone"/>
+            <!--Wykres słupkowy dla danego miesiąca-->
+            <com.github.mikephil.charting.charts.BarChart
+                android:id="@+id/categoryBarChart"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:layout_marginTop="5dp"
+                android:visibility="gone"/>
+            <TextView
+                android:id="@+id/textPersonChartTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Wydatki według osób"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"
+                android:layout_gravity="center"
+                android:layout_marginTop="25dp"
+                android:visibility="gone"/>
+            <!--Wykres słupkowy dla osób wydały w danym miesiącu-->
+            <com.github.mikephil.charting.charts.BarChart
+                android:id="@+id/personBarChart"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:layout_marginTop="5dp"
+                android:visibility="gone"/>
+        </LinearLayout>
+        <Button
+            android:id="@+id/buttonBackToMain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Powrót do ekranu głównego"
+            android:textColor="@color/buttonText"
+            android:backgroundTint="@color/buttonBackground"
+            android:elevation="2dp"
+            android:layout_marginTop="16dp"/>
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--colors.xml dla motywu ciemnego – definicje kolorów używanych w aplikacji (motyw, wykresy, tła itp.).-->
+
+<resources>
+    <!--Ogólne kolory-->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!--Fioletowe przyciski-->
+    <color name="buttonBackground">#D0B6F0</color>
+    <color name="buttonText">#000000</color>
+
+    <!--Niebieskie przyciski-->
+    <color name="buttonPrimaryBackground">#63A4FF</color>
+    <color name="buttonPrimaryText">#FFFFFF</color>
+
+    <!-- Czerwone przyciski (RESET, USUŃ) -->
+    <color name="buttonDangerBackground">#D32F2F</color>
+    <color name="buttonDangerText">#FFFFFF</color>
+
+    <!--Kolor status opłacony i nieopłacony-->
+    <color name="statusPaid">#5CB85C</color>
+    <color name="statusUnpaid">#D9534F</color>
+
+    <!--Dialog categorii i osób w SettingsActivity-->
+    <color name="dialogBackground">#1E1E1E</color>
+    <color name="dialogText">#ECECEC</color>
+    <color name="dialogHint">#A0A0A0</color>
+    <color name="dialogStroke">#A3A3A3</color>
+
+    <!--Kolory separatora-->
+    <color name="dividerLight">#33000000</color>  <!-- czarny 20% -->
+    <color name="dividerDark">#33FFFFFF</color>   <!-- biały 20% -->
+</resources>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="20dp">
+    <!-- dialog_loading.xml – dialog ładowania operacji (np. reset danych) -->
+    <ProgressBar
+        android:id="@+id/loadingSpinner"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:indeterminate="true"/>
+
+    <TextView
+        android:id="@+id/loadingText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Przetwarzanie..."
+        android:textSize="16sp"
+        android:layout_marginStart="20dp"
+        android:textColor="@color/dialogText"/>
+
+</LinearLayout>

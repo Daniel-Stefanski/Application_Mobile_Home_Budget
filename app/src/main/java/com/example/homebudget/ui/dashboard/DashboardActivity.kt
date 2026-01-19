@@ -555,29 +555,30 @@ class DashboardActivity : AppCompatActivity() {
 
             val summaryColor = if (isDarkMode) Color.parseColor("#EAEAEA") else Color.parseColor("#202020")
             textSummary.setTextColor(summaryColor)
-            val summaryText = "💰 Budżet: ${MoneyFormatter.formatWithCurrency(currentMonthBudget)}" +
-                        " — 📊 Wydano: ${MoneyFormatter.formatWithCurrency(totalSpent)}"
+            val builder = StringBuilder()
+            builder.append("📊 Wydano: ${MoneyFormatter.formatWithCurrency(totalSpent)}\n\n")
+            builder.append("💰 Budżet: ${MoneyFormatter.formatWithCurrency(currentMonthBudget)}")
+            val spannable = SpannableString(
+                if (currentMonthBudget > 0 && totalSpent > currentMonthBudget) {
+                    val exceeded = totalSpent - currentMonthBudget
+                    builder.append("\n\n❌ Przekroczono o: ${MoneyFormatter.formatWithCurrency(exceeded)}")
+                    builder.toString()
+                } else {
+                    builder.toString()
+                }
+            )
+            // Kolor tylko dla przekroczenia
             if (currentMonthBudget > 0 && totalSpent > currentMonthBudget) {
-                val exceeded = totalSpent - currentMonthBudget
-                val exceededText = "\n❌ Przekroczono o: ${MoneyFormatter.formatWithCurrency(exceeded)}"
-                val fullText = summaryText + exceededText
-                val spannable = SpannableString(fullText)
-                // Kolorujemy tylko linie z przekroczeniem
+                val start = spannable.indexOf("❌")
                 spannable.setSpan(
                     ForegroundColorSpan(Color.parseColor("#E74C3C")),
-                    summaryText.length,
-                    fullText.length,
+                    start,
+                    spannable.length,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
-                textSummary.text = spannable
-            } else {
-                textSummary.text = summaryText
-                textSummary.setTextColor(
-                    if (isDarkMode) Color.parseColor("#EAEAEA") else Color.parseColor("#202020")
-                )
             }
-            textSummary.textAlignment = View.TEXT_ALIGNMENT_CENTER
-            textSummary.textSize = 17f
+            textSummary.text = spannable
+            textSummary.textSize = 16f
 
             // 🔸 Sprawdzenie, czy przekroczono 80% lub 100% budżetu
             checkBudgetWarning(totalSpent, currentMonthBudget)

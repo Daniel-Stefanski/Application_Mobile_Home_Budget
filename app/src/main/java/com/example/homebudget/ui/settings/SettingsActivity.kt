@@ -282,31 +282,19 @@ class SettingsActivity : AppCompatActivity(){
 
         //Obsługa zmiany motywu
         fun selectTheme(mode: String) {
-            when (mode) {
-                "light" -> {
-                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                    radioLight.isChecked = true
-                    radioDark.isChecked = false
-                    radioSystem.isChecked = false
-                }
-                "dark" -> {
-                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                    radioLight.isChecked = false
-                    radioDark.isChecked = true
-                    radioSystem.isChecked = false
-                }
-                "system" -> {
-                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-                    radioLight.isChecked = false
-                    radioDark.isChecked = false
-                    radioSystem.isChecked = true
-                }
+            val newMode = when (mode) {
+                "light" -> AppCompatDelegate.MODE_NIGHT_NO
+                "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
-
-            Prefs.setAppTheme(this, mode)
-
-            delegate.applyDayNight()
-            recreate()
+            val currentMode = AppCompatDelegate.getDefaultNightMode()
+            if (currentMode != newMode) {
+                Prefs.setAppTheme(this, mode)
+                AppCompatDelegate.setDefaultNightMode(newMode)
+            }
+            radioLight.isChecked = mode == "light"
+            radioDark.isChecked = mode == "dark"
+            radioSystem.isChecked = mode == "system"
         }
 
         fun setThemeRowClick(row: View, radio: RadioButton, mode: String) {

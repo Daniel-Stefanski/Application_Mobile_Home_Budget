@@ -80,7 +80,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Budżet: 0 zł - Wydano: 0 zł"
-                android:textAlignment="center"
+                android:textAlignment="viewStart"
+                android:gravity="start"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="?android:textColorPrimary"
@@ -88,8 +89,10 @@
                 android:shadowDx="1"
                 android:shadowDy="1"
                 android:shadowRadius="2"
-                android:paddingBottom="16dp"
-                android:paddingTop="8dp"/>
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="12dp"
+                android:paddingTop="12dp"/>
         </LinearLayout>
 
         <!--Kontener dla legendy / listy kategorii-->

@@ -20,7 +20,7 @@
 
         <!-- Receivery -->
         <receiver android:name=".notifications.receiver.BillsNotificationReceiver"
-            android:exported="true"/>
+            android:exported="false"/>
         <receiver android:name=".notifications.receiver.SavingsGoalNotificationReceiver"
             android:exported="false"/>
         <receiver android:name=".notifications.receiver.DashboardBudgetNotificationReceiver"
@@ -35,23 +35,48 @@
             </intent-filter>
         </receiver>
 
-        <activity android:name=".ui.statistics.StatisticsActivity"/>
-        <activity android:name=".ui.settings.SettingsActivity"/>
-        <activity android:name=".ui.billsplanner.AddBillActivity" android:exported="false"/>
-        <activity android:name=".ui.billsplanner.BillsPlannerActivity" android:exported="false"/>
-        <activity android:name=".ui.savings.SavingsActivity"/>
-        <activity android:name=".ui.history.HistoryActivity"/>
-        <activity android:name=".ui.auth.TermsActivity"/>
-        <activity android:name=".ui.addexpense.AddExpenseActivity"/>
-        <activity android:name=".ui.dashboard.DashboardActivity"/>
-        <activity android:name=".ui.auth.ResetPasswordActivity"/>
-        <activity android:name=".ui.auth.RegisterActivity"/>
+        <activity android:name=".ui.statistics.StatisticsActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.settings.SettingsActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.billsplanner.AddBillActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.billsplanner.BillsPlannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.savings.SavingsActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.history.HistoryActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.auth.TermsActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.addexpense.AddExpenseActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.dashboard.DashboardActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.auth.ResetPasswordActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
+        <activity android:name=".ui.auth.RegisterActivity"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity"/>
         <activity
             android:name=".ui.auth.LoginActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

@@ -105,6 +105,7 @@ class ExpenseAdapter(private var groupedItems: List<ListItem>) :
         val grouped = mutableListOf<ListItem>()
 
         expenses
+            .sortedByDescending { it.date }
             .groupBy { dateFormat.format(Date(it.date)) } // tylko grupowanie!
             .forEach { (date, items) ->
                 grouped.add(ListItem.Header(date))

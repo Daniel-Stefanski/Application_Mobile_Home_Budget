@@ -5,6 +5,7 @@ import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.text.InputFilter
+import android.util.Log
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -21,6 +22,9 @@ import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
+import com.example.homebudget.data.entity.PendingSync
+import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.money.MoneyUtils
@@ -29,6 +33,7 @@ import com.example.homebudget.utils.settings.SettingsHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -126,7 +131,7 @@ class AddExpenseActivity : AppCompatActivity() {
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                 categorySpinner.adapter = adapter
                 // Ustawienie wartości domyślnej z ustawień
-                val defaultCategory = Prefs.getDefaultCategory(this@AddExpenseActivity)
+                val defaultCategory = settings?.defaultCategory ?: "Brak"
                 val index = categories.indexOf(defaultCategory)
                 categorySpinner.setSelection(if (index >= 0) index else 0)
             }
@@ -139,9 +144,17 @@ class AddExpenseActivity : AppCompatActivity() {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         paymentSpinner.adapter = adapter
         // Ustawienie wartości domyślnej z ustawień
-        val defaultPayment = Prefs.getDefaultPayment(this@AddExpenseActivity)
-        val index = payments.indexOf(defaultPayment)
-        paymentSpinner.setSelection(if (index >= 0) index else 0)
+        lifecycleScope.launch {
+            val settings = AppDatabase
+                .getDatabase(this@AddExpenseActivity)
+                .settingsDao()
+                .getSettingsForUser(Prefs.getUserId(this@AddExpenseActivity))
+            withContext(Dispatchers.Main) {
+                val defaultPayment = settings?.defaultPaymentMethod ?: "Brak"
+                val index = payments.indexOf(defaultPayment)
+                paymentSpinner.setSelection(if (index >= 0) index else 0)
+            }
+        }
     }
 
     private fun setupPersonSpinner() {
@@ -316,8 +329,35 @@ class AddExpenseActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val db = AppDatabase.Companion.getDatabase(this@AddExpenseActivity)
+            val supabaseUid = Prefs.getSupabaseUid(this@AddExpenseActivity)
+                ?: run {
+                   withContext(Dispatchers.Main) {
+                       Toast.makeText(this@AddExpenseActivity, "Brak połączenia z kontem Supabase", Toast.LENGTH_SHORT).show()
+                   }
+                    return@launch
+                }
             withContext(Dispatchers.IO) {
-                db.expenseDao().insertExpense(expense)
+                // Zapis zawsze lokalnie
+                val localId = db.expenseDao().insertExpense(expense).toInt()
+                // Spróbuj wysłac do Supabase
+                try {
+                    val remoteId = ExpenseRemoteRepository.insertExpense(
+                        supabaseUid = supabaseUid,
+                        expense = expense.copy(id = localId) // żeby payload miał id
+                    )
+                    db.expenseDao().updateRemoteId(localId, remoteId)
+                } catch (e: Exception) {
+                    // Jeśli brak internetu -> kolejka
+                    db.pendingSyncDao().insert(
+                        PendingSync(
+                            entityType = SyncConstants.ENTITY_EXPENSE,
+                            operation = SyncConstants.OP_INSERT,
+                            localId = localId,
+                            remoteId = null,
+                            payloadJson = Json.encodeToString(Expense.serializer(), expense.copy(id = localId))
+                        )
+                    )
+                }
             }
 
             withContext(Dispatchers.Main) {

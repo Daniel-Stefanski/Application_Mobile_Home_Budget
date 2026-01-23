@@ -16,10 +16,16 @@ import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.R
 import com.example.homebudget.data.dao.UserDao
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.data.entity.User
+import com.example.homebudget.data.remote.AuthRepository
+import com.example.homebudget.data.remote.testFetchExpenses
 import com.example.homebudget.notifications.NotificationHelper
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.work.scheduler.WorkScheduler
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 //LoginActivity.kt (wcześniej MainActivity) – ekran logowania do aplikacji.
 class LoginActivity : AppCompatActivity() {
@@ -102,45 +108,70 @@ class LoginActivity : AppCompatActivity() {
         buttonLogin.setOnClickListener {
             // Zabezpieczenie przed niechcianym miganie komunikatu
             textLoginError.visibility = View.GONE
-            val email = editTextEmail.text.toString()
+            val email = editTextEmail.text.toString().trim().lowercase()
             val password = editTextPassword.text.toString()
 
             lifecycleScope.launch {
-                val user = userDao.getUserByUsername(email)
-                if (user != null && user.password == password) {
-                    // Zapisanie preferencji jeśli zaznaczono checkbox
-                    if (checkBoxRememberMe.isChecked) {
-                        Prefs.setRememberMe(this@LoginActivity, checkBoxRememberMe.isChecked)
-                        Prefs.setUserId(this@LoginActivity, user.id)
-                    } else {
-                        Prefs.setUserId(this@LoginActivity, user.id)
-                        Prefs.setRememberMe(this@LoginActivity, checkBoxRememberMe.isChecked)
-                    }
-
-                    //Zaktualizuj datę ostatniego logowania
-                    lifecycleScope.launch {
-                        userDao.updateLastLogin(user.id, System.currentTimeMillis())
-                    }
-
-                    val intent = Intent(this@LoginActivity, DashboardActivity::class.java)
-                    intent.putExtra("USER_ID", user.id)
-                    startActivity(intent)
-                    finish()
-                } else {
-                    runOnUiThread {
-                        editTextEmail.setBackgroundResource(R.drawable.shape_search_border_error)
-                        editTextPassword.setBackgroundResource(R.drawable.shape_search_border_error)
-                        // Pokaż komunikat pod formualrzem
+                // Logowanie w Supabase
+                val result = AuthRepository.signIn(email, password)
+                if (result.isFailure) {
+                    withContext(Dispatchers.Main) {
                         textLoginError.visibility = View.VISIBLE
-                        Toast.makeText(this@LoginActivity, "Nieprawidłowy email lub hasło", Toast.LENGTH_SHORT).show()
-                        // Cofnięcie błędów po chwili
-                        editTextEmail.postDelayed({
-                            editTextEmail.setBackgroundResource(R.drawable.shape_search_border)
-                            editTextPassword.setBackgroundResource(R.drawable.shape_search_border)
-                            textLoginError.visibility = View.GONE
-                        }, 1500)
+                        Toast.makeText(
+                            this@LoginActivity,
+                            "❌ Nieprawidłowy email lub hasło",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
+                    return@launch
                 }
+                // Sukces logowania
+                val supabaseUser = result.getOrThrow()
+                val supabaseUid = supabaseUser.id
+                // Zapisz Supabase_UID
+                Prefs.setSupabaseUid(this@LoginActivity, supabaseUid)
+                WorkSchedulerSupabase.scheduleSupabaseSync(this@LoginActivity)
+
+                // Sprawdź lokalnego usera (Room)
+                var localUser = withContext(Dispatchers.IO) {
+                    userDao.getUserByUsername(email)
+                }
+                // Jeśli brak -> twórz lokalnego usera (office cache)
+                val userId = if (localUser == null) {
+                    val now = System.currentTimeMillis()
+                    val newUser = User(
+                        username = email,
+                        password = password,
+                        name = "",
+                        createdAt = now,
+                        lastLogin = now
+                    )
+                    withContext(Dispatchers.IO) {
+                        userDao.insertUser(newUser).toInt()
+                    }
+                } else {
+                    // Update last login
+                    withContext(Dispatchers.IO) {
+                        userDao.updateLastLogin(localUser.id, System.currentTimeMillis())
+                    }
+                    localUser.id
+                }
+                // Zapisz USER_ID i Remember me
+                Prefs.setUserId(this@LoginActivity, userId)
+                Prefs.setRememberMe(this@LoginActivity, checkBoxRememberMe.isChecked)
+                // Dashboard
+                withContext(Dispatchers.Main) {
+                    startActivity(Intent(this@LoginActivity, DashboardActivity::class.java))
+                    finish()
+                }
+            }
+        }
+        lifecycleScope.launch {
+            val result = testFetchExpenses()
+            if (result.isSuccess) {
+                Toast.makeText(this@LoginActivity, "✅ Supabase OK", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this@LoginActivity, "❌ ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

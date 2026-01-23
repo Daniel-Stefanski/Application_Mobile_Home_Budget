@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 
@@ -52,22 +53,23 @@ class DailyResetWorker(context: Context, workerParams: WorkerParameters)
 
                 // Reset następuje jeśli minęło tyle miesięcy, ile wymagamy
                 if (monthsPassed >= expense.repeatInterval) {
-
-                    // RESET STATUSU
-                    expenseDao.updateStatus(expense.id, "nieopłacony")
-
-                    expenseDao.updateLastReset(expense.id, System.currentTimeMillis())
-
-                    // PRZESUWAMY DATĘ NA NOWY CYKL
-                    lastPayment.add(Calendar.MONTH, expense.repeatInterval)
-                    expenseDao.updateExpenseFull(
-                        expense.id,
-                        expense.description ?: "",
-                        expense.amount,
-                        expense.note,
-                        lastPayment.timeInMillis,
-                        expense.repeatInterval
+                    val newDate = lastPayment.apply {
+                        add(Calendar.MONTH, expense.repeatInterval)
+                    }.timeInMillis
+                    val updatedExpense = expense.copy(
+                        status = "nieopłacony",
+                        lastReset = System.currentTimeMillis(),
+                        date = newDate
                     )
+                    // Room
+                    expenseDao.updateExpense(updatedExpense)
+                    // Supabase
+                    if (updatedExpense.remoteId != null) {
+                        ExpenseRemoteRepository.updateExpense(
+                            updatedExpense.remoteId!!,
+                            updatedExpense
+                        )
+                    }
                     Log.d("DailyResetWorker", "Reset wykonany dla ID=${expense.id}")
                 }
             }

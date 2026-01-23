@@ -21,7 +21,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Contribution
+import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.entity.SavingsGoal
+import com.example.homebudget.data.remote.repository.SavingsRemoteRepository
+import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.SavingsGoalAlarmScheduler
 import com.example.homebudget.notifications.NotificationHelper
 import com.example.homebudget.ui.dashboard.DashboardActivity
@@ -29,7 +32,13 @@ import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.money.MoneyUtils
 import com.example.homebudget.utils.settings.Prefs
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
+import com.google.android.material.color.MaterialColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import java.util.Calendar
 import java.util.Locale
@@ -216,6 +225,8 @@ class SavingsActivity : AppCompatActivity() {
                 if (title.isNotBlank() && amount != null) {
                     val db = AppDatabase.getDatabase(this)
                     lifecycleScope.launch {
+                        val supabaseUid = Prefs.getSupabaseUid(this@SavingsActivity)
+                            ?: return@launch
                         val goal = SavingsGoal(
                             userId = userId,
                             title = title,
@@ -223,14 +234,25 @@ class SavingsActivity : AppCompatActivity() {
                             endDate = selectedEndDate,
                             sharedWith = if (selectedPeople.isEmpty()) null else selectedPeople.joinToString(", ")
                         )
-                        val insertedId = db.savingsGoalDao().insert(goal)
-                        val goalWithId = goal.copy(id = insertedId.toInt())
-                        // Sprawdź czy powiadomienia są właczone (tak jak przy rachunkach)
-                        val notificationEnabled = Prefs.isNotificationsEnabled(this@SavingsActivity)
-                        if (notificationEnabled) {
-                            SavingsGoalAlarmScheduler.scheduleAllRemindersForGoal(this@SavingsActivity, goalWithId)
+                        val localId = db.savingsGoalDao().insert(goal).toInt()
+                        try {
+                            val remoteId = SavingsRemoteRepository.insertGoal(supabaseUid, goal.copy(id = localId))
+                            db.savingsGoalDao().update(goal.copy(id = localId, remoteId = remoteId))
+                        } catch (e: Exception) {
+                            db.pendingSyncDao().insert(
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                    operation = SyncConstants.OP_INSERT,
+                                    localId = localId,
+                                    remoteId = null,
+                                    payloadJson = Json.encodeToString(
+                                        SavingsGoal.serializer(),
+                                        goal.copy(id = localId)
+                                    )
+                                )
+                            )
+                            WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
                         }
-                        loadGoals()
                         selectedEndDate = null
                     }
                 } else {
@@ -368,13 +390,45 @@ class SavingsActivity : AppCompatActivity() {
                                 endDate = endDate,
                                 sharedWith = if (selectedPeople.isEmpty()) null else selectedPeople.joinToString(", ")
                             )
+                        val supabaseUid = Prefs.getSupabaseUid(this@SavingsActivity)
+                            ?: return@launch
+                        if (!supabaseUid.isNullOrBlank()) {
+                            try {
+                                if (updateGoal.remoteId != null) {
+                                    SavingsRemoteRepository.updateGoal(
+                                        updateGoal.remoteId!!,
+                                        updateGoal
+                                    )
+                                } else {
+                                    val remoteId = SavingsRemoteRepository.insertGoal(
+                                        supabaseUid,
+                                        updateGoal
+                                    )
+                                    db.savingsGoalDao().updateRemoteId(updateGoal.id, remoteId)
+                                }
+                            } catch (e: Exception) {
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                        operation = if (updateGoal.remoteId == null)
+                                            SyncConstants.OP_INSERT else SyncConstants.OP_UPDATE,
+                                        localId = updateGoal.id,
+                                        remoteId = updateGoal.remoteId,
+                                        payloadJson = Json.encodeToString(
+                                            SavingsGoal.serializer(),
+                                            updateGoal
+                                        )
+                                    )
+                                )
+                                WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
+                            }
+                        }
+                        // Room
                         db.savingsGoalDao().update(updateGoal)
-                        // Powiadomienia
-                        val notificationsEnabled = Prefs.isNotificationsEnabled(this@SavingsActivity)
                         // Najpierw wyczyść stare
                         SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, updateGoal.id)
                         // Jeśli jest endDate i cel nie osiągnięty -> ustaw nowe
-                        if (notificationsEnabled) {
+                        if (Prefs.isNotificationsEnabled(this@SavingsActivity)) {
                             SavingsGoalAlarmScheduler.scheduleAllRemindersForGoal(this@SavingsActivity, updateGoal)
                         }
                         loadGoals()
@@ -447,7 +501,6 @@ class SavingsActivity : AppCompatActivity() {
                         val shouldSendNotification = reachedNow && !goal.notificationCompletedSent
                         //Zaktualizuj kwote w SavingGoal
                         val updatedGoal = goal.copy(savedAmount = after, notificationCompletedSent = goal.notificationCompletedSent || reachedNow)
-                        db.savingsGoalDao().update(updatedGoal)
                         // Jeśli cel osiągnięto Teraz -> wyślik powiadomienie systemowe
                         if (shouldSendNotification && Prefs.isNotificationsEnabled(this@SavingsActivity)) {
                             // Anuluj istniejące przypomnienia, nie maja sensu gdy cel zrobiony
@@ -457,15 +510,77 @@ class SavingsActivity : AppCompatActivity() {
                             // Systemowe powiadomeinia
                             NotificationHelper.notifySavings(this@SavingsActivity, updatedGoal.id * 10000 + 999 /*unikalne ID*/, title, text)
                         }
-                        //Zapisz nowy wkład do tabeli Contribution
-                        db.contributionDao().insert(
-                            Contribution(
-                                userId = userId,
-                                goalId = goal.id,
-                                personName = selectedPerson,
-                                amount = amount
-                            )
+                        val supabaseUid = Prefs.getSupabaseUid(this@SavingsActivity) ?: return@launch
+                        val remoteGoalId = goal.remoteId
+                        val contribution = Contribution(
+                            userId = userId,
+                            goalId = goal.id,
+                            personName = selectedPerson,
+                            amount = amount
                         )
+                        val localContributionId = db.contributionDao().insert(contribution)
+                        if (remoteGoalId == null) {
+                            db.pendingSyncDao().insert(
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_CONTRIBUTION,
+                                    operation = SyncConstants.OP_INSERT,
+                                    localId = localContributionId.toInt(),
+                                    remoteId = null,
+                                    payloadJson = Json.encodeToString(Contribution.serializer(), contribution)
+                                )
+                            )
+                            db.pendingSyncDao().insert(
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                    operation = SyncConstants.OP_UPDATE,
+                                    localId = updatedGoal.id,
+                                    remoteId = null,
+                                    payloadJson = Json.encodeToString(SavingsGoal.serializer(), updatedGoal)
+                                )
+                            )
+                            WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
+                        } else {
+                            // Supabase - contribution
+                            try {
+                                SavingsRemoteRepository.insertContribution(
+                                    supabaseUid,
+                                    remoteGoalId,
+                                    contribution
+                                )
+                                // Supabase - update
+                                SavingsRemoteRepository.updateGoal(remoteGoalId, updatedGoal)
+                            } catch (e: Exception) {
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_CONTRIBUTION,
+                                        operation = SyncConstants.OP_INSERT,
+                                        localId = localContributionId.toInt(),
+                                        remoteId = null,
+                                        payloadJson = Json.encodeToString(
+                                            Contribution.serializer(),
+                                            contribution
+                                        )
+                                    )
+                                )
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                        operation = SyncConstants.OP_UPDATE,
+                                        localId = updatedGoal.id,
+                                        remoteId = updatedGoal.remoteId,
+                                        payloadJson = Json.encodeToString(
+                                            SavingsGoal.serializer(),
+                                            updatedGoal
+                                        )
+                                    )
+                                )
+                                WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
+                            }
+                        }
+                        // Room
+                        //Zapisz nowy wkład do tabeli Contribution
+                        db.savingsGoalDao().update(updatedGoal)
+
                         //Odśwież listę celów
                         loadGoals()
                     }
@@ -537,17 +652,85 @@ class SavingsActivity : AppCompatActivity() {
                 }
                 lifecycleScope.launch {
                     val db = AppDatabase.getDatabase(this@SavingsActivity)
-                    val updateGoal = goal.copy(savedAmount = goal.savedAmount - amount)
-                    db.savingsGoalDao().update(updateGoal)
-                    //Zapisz nowy wkład do tabeli Contribution
-                    db.contributionDao().insert(
-                        Contribution(
-                            userId = userId,
-                            goalId = goal.id,
-                            personName = selectedPerson,
-                            amount = -amount
-                        )
+                    val updatedGoal = goal.copy(savedAmount = goal.savedAmount - amount)
+
+                    val supabaseUid = Prefs.getSupabaseUid(this@SavingsActivity) ?: return@launch
+                    val remoteGoalId = goal.remoteId
+                    val contribution = Contribution(
+                        userId = userId,
+                        goalId = goal.id,
+                        personName = selectedPerson,
+                        amount = -amount
                     )
+                    val localContributionId = db.contributionDao().insert(contribution)
+                    if (remoteGoalId == null) {
+                        db.pendingSyncDao().insert(
+                            PendingSync(
+                                entityType = SyncConstants.ENTITY_CONTRIBUTION,
+                                operation = SyncConstants.OP_INSERT,
+                                localId = localContributionId.toInt(),
+                                remoteId = null,
+                                payloadJson = Json.encodeToString(
+                                    Contribution.serializer(),
+                                    contribution
+                                )
+                            )
+                        )
+                        db.pendingSyncDao().insert(
+                            PendingSync(
+                                entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                operation = SyncConstants.OP_UPDATE,
+                                localId = updatedGoal.id,
+                                remoteId = null,
+                                payloadJson = Json.encodeToString(
+                                    SavingsGoal.serializer(),
+                                    updatedGoal
+                                )
+                            )
+                        )
+                        WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
+                    } else {
+                        // Supabase - contribution
+                        try {
+                            SavingsRemoteRepository.insertContribution(
+                                supabaseUid,
+                                remoteGoalId,
+                                contribution
+                            )
+                            // Supabase - update
+                            SavingsRemoteRepository.updateGoal(remoteGoalId, updatedGoal)
+                        } catch (e: Exception) {
+                            db.pendingSyncDao().insert(
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_CONTRIBUTION,
+                                    operation = SyncConstants.OP_INSERT,
+                                    localId = localContributionId.toInt(),
+                                    remoteId = null,
+                                    payloadJson = Json.encodeToString(
+                                        Contribution.serializer(),
+                                        contribution
+                                    )
+                                )
+                            )
+
+                            db.pendingSyncDao().insert(
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                    operation = SyncConstants.OP_UPDATE,
+                                    localId = updatedGoal.id,
+                                    remoteId = updatedGoal.remoteId,
+                                    payloadJson = Json.encodeToString(
+                                        SavingsGoal.serializer(),
+                                        updatedGoal
+                                    )
+                                )
+                            )
+                            WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
+                        }
+                    }
+                    // Room
+                    db.savingsGoalDao().update(updatedGoal)
+
                     loadGoals()
                 }
             }
@@ -586,18 +769,30 @@ class SavingsActivity : AppCompatActivity() {
                     // Podsumowanie
                     val summaryTitle = TextView(this@SavingsActivity).apply {
                         text = "📊 PODSUMOWANIE:"
-                        setTextColor(getColor(android.R.color.white))
                         textSize = 15f
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
                         setPadding(0, 0, 0, 8)
+                        setTextColor(
+                            MaterialColors.getColor(
+                                this@SavingsActivity,
+                                com.google.android.material.R.attr.colorOnSurface,
+                                    getColor(android.R.color.black)
+                            )
+                        )
                     }
                     val summaryText = TextView(this@SavingsActivity).apply {
                         text = summary
-                        setTextColor(getColor(android.R.color.white))
                         textSize = 14f
                         gravity = Gravity.START
                         textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                        setTextColor(
+                            MaterialColors.getColor(
+                                this@SavingsActivity,
+                                com.google.android.material.R.attr.colorOnSurface,
+                                getColor(android.R.color.black)
+                            )
+                        )
                     }
                     // Separator
                     val separator = TextView(this@SavingsActivity).apply {
@@ -610,18 +805,30 @@ class SavingsActivity : AppCompatActivity() {
                     // Historia
                     val historyTitle = TextView(this@SavingsActivity).apply {
                         text = "📜 HISTORIA:"
-                        setTextColor(getColor(android.R.color.white))
                         textSize = 15f
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
                         setPadding(0, 8, 0, 8)
+                        setTextColor(
+                            MaterialColors.getColor(
+                                this@SavingsActivity,
+                                com.google.android.material.R.attr.colorOnSurface,
+                                getColor(android.R.color.black)
+                            )
+                        )
                     }
                     val historyText = TextView(this@SavingsActivity).apply {
                         text = history
-                        setTextColor(getColor(android.R.color.white))
                         textSize = 14f
                         gravity = Gravity.START
                         textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                        setTextColor(
+                            MaterialColors.getColor(
+                                this@SavingsActivity,
+                                com.google.android.material.R.attr.colorOnSurface,
+                                getColor(android.R.color.black)
+                            )
+                        )
                     }
                     container.addView(summaryTitle)
                     container.addView(summaryText)
@@ -648,6 +855,27 @@ class SavingsActivity : AppCompatActivity() {
                 SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, goal.id)
                 val db = AppDatabase.getDatabase(this)
                 lifecycleScope.launch {
+                    try {
+                        if (goal.remoteId != null) {
+                            SavingsRemoteRepository.deleteGoal(goal.remoteId!!)
+                        }
+                    } catch (e: Exception) {
+                        db.pendingSyncDao().insert(
+                            PendingSync(
+                                entityType = SyncConstants.ENTITY_SAVINGS_GOAL,
+                                operation = SyncConstants.OP_DELETE,
+                                localId = goal.id,
+                                remoteId = goal.remoteId,
+                                payloadJson = Json.encodeToString(
+                                    SavingsGoal.serializer(),
+                                    goal
+                                )
+                            )
+                        )
+                        withContext(Dispatchers.Main) {
+                            WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
+                        }
+                    }
                     db.savingsGoalDao().delete(goal)
                     loadGoals()
                 }

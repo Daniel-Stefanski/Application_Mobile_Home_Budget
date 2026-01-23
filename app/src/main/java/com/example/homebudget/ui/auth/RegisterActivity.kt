@@ -27,6 +27,7 @@ import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.MonthlyBudget
 import com.example.homebudget.data.entity.Settings
 import com.example.homebudget.data.entity.User
+import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -191,7 +192,31 @@ class RegisterActivity : AppCompatActivity() {
                         emailField.error = "Email już istnieje"
                     }
                 } else {
-                    // Tworzymy nowego użytkownika
+                    // 1) Rejestracja w Supabase Auth (email+haslo)
+                    val supaResult = AuthRepository.signUp(email, password)
+
+                    if (supaResult.isFailure) {
+                        withContext(Dispatchers.Main) {
+                            progressBar.visibility = View.GONE
+                            registerButton.isEnabled = true
+                            Toast.makeText(
+                                this@RegisterActivity,
+                                "❌ Supabase: ${supaResult.exceptionOrNull()?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        return@launch
+                    }
+
+                    val supabaseUser = supaResult.getOrThrow()
+                    val supabaseUid = supabaseUser.id // UUID jako String
+
+                    // 2) Zapisz supabase UID w Prefs
+                    withContext(Dispatchers.Main) {
+                        Prefs.setSupabaseUid(this@RegisterActivity, supabaseUid)
+                    }
+
+                    // 3) Dopiero teraz tworzysz lokalnego usera (offline)
                     val currentTime = System.currentTimeMillis()
                     val safeName = name.trim().take(20)
                     val newUser = User(
@@ -203,19 +228,18 @@ class RegisterActivity : AppCompatActivity() {
                         lastLogin = currentTime
                     )
 
-                    // Wstawienie usera i pobranie ID
                     val userId = withContext(Dispatchers.IO) {
                         userDao.insertUser(newUser).toInt()
                     }
 
-                    // Zapisz USER_ID do SharedPreferences
+                    // 4) Zapisz lokalny USER_ID do Prefs jak dotychczas
                     withContext(Dispatchers.Main) {
                         Prefs.setUserId(this@RegisterActivity, userId)
                     }
 
+
                     // Tworzymy domyślne ustawienia dla nowego użytkownika
                     val defaultSettings = Settings(
-                        id = 0,
                         userId = userId,
                         categories = "[\"Jedzenie\",\"Transport\",\"Rachunki\",\"Rozrywka\",\"Inne\"]",
                         currency = "PLN",

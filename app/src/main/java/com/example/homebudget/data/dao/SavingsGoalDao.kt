@@ -30,4 +30,13 @@ interface SavingsGoalDao {
     // Wszystkie cele z terminem (dla BootReceiver)
     @Query("SELECT * FROM savings_goals WHERE endDate IS NOT NULL")
     suspend fun getAllWithEndDate(): List<SavingsGoal>
+
+    @Query("DELETE FROM savings_goals WHERE userId = :userId")
+    suspend fun deleteAll(userId: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(goals: List<SavingsGoal>)
+
+    @Query("UPDATE savings_goals SET remoteId = :remoteId WHERE id = :localId")
+    suspend fun updateRemoteId(localId: Int, remoteId: Long)
 }

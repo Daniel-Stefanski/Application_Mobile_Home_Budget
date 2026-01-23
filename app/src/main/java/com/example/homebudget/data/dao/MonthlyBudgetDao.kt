@@ -15,6 +15,12 @@ interface MonthlyBudgetDao {
     @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
     suspend fun insertBudget(monthlyBudget: MonthlyBudget)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<MonthlyBudget>)
+
+    @Query("DELETE FROM monthly_budgets WHERE userId = :userId")
+    suspend fun deleteAll(userId: Int)
+
     // Aktualizacja istniejącego budżetu
     @Update
     suspend fun updateBudget(monthlyBudget: MonthlyBudget)

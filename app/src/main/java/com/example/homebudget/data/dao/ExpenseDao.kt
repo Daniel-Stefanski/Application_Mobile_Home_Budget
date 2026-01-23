@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.example.homebudget.data.dto.CategorySum
 import com.example.homebudget.data.dto.PersonSum
 import com.example.homebudget.data.entity.Expense
@@ -14,6 +15,9 @@ interface ExpenseDao {
     // Wstawia wydatek i zwraca id (Long)
     @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
     suspend fun insertExpense(expense: Expense): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(expenses: List<Expense>)
 
     // Lista wydatków dla usera (opcjonalnie - przydatne)
     @Query("SELECT * FROM expenses WHERE userId = :userId ORDER BY timestamp DESC")
@@ -43,6 +47,9 @@ interface ExpenseDao {
     @Query("UPDATE expenses SET description = :description, amount = :amount, note = :note, date = :date, repeatInterval = :interval WHERE id = :expenseId")
     suspend fun updateExpenseFull(expenseId: Int, description: String, amount: Double, note: String?, date: Long, interval: Int)
 
+    @Update
+    suspend fun updateExpense(expense: Expense)
+
     @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
     suspend fun getExpenseById(id: Int): Expense?
 
@@ -61,4 +68,10 @@ interface ExpenseDao {
 
    @Query("UPDATE expenses SET date = :newDate WHERE id = :expenseId")
    suspend fun updateDate(expenseId: Int, newDate: Long)
+
+    @Query("UPDATE expenses SET remoteId = :remoteId WHERE id = :localId")
+    suspend fun updateRemoteId(localId: Int, remoteId: Long)
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun deleteExpenseById(id: Int)
 }

@@ -3,8 +3,10 @@ package com.example.homebudget.data.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.Index
+import kotlinx.serialization.Serializable
 
 //Expense.kt – model danych pojedynczego wydatku.
+@Serializable
 @Entity(tableName = "expenses",
     indices = [
         Index(value = ["userId"]),
@@ -18,6 +20,7 @@ import androidx.room.Index
 data class Expense(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val userId: Int,
+    val remoteId: Long? = null,
     val category: String,
     val amount: Double,
     val description: String?, //ktrótki opis wydatku

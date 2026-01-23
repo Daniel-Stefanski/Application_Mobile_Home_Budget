@@ -36,7 +36,12 @@ import com.example.homebudget.ui.statistics.StatisticsActivity
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.dto.CategorySum
 import com.example.homebudget.data.entity.MonthlyBudget
+import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.entity.Settings
+import com.example.homebudget.data.remote.repository.MonthlyBudgetRemoteRepository
+import com.example.homebudget.data.sync.DashboardSyncManager
+import com.example.homebudget.data.sync.SyncConstants
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmScheduler
 import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.money.MoneyFormatter
@@ -49,6 +54,7 @@ import com.github.mikephil.charting.formatter.PercentFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.Month
@@ -60,6 +66,7 @@ import kotlin.collections.iterator
 class DashboardActivity : AppCompatActivity() {
 
     private var userId: Int = -1
+    private var firstLoadDone = false
     private lateinit var textWelcome: TextView
     private lateinit var pieChart: PieChart
     private lateinit var textSummary: TextView
@@ -79,14 +86,14 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_dashboard)
-
         //Wczytanie i zastosowanie wybranego motywu aplikacji
         when (Prefs.getAppTheme(this)) {
             "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
             "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
             else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         }
+        // Dopiero layout
+        setContentView(R.layout.activity_dashboard)
 
         textWelcome = findViewById(R.id.textWelcome)
         pieChart = findViewById(R.id.pieChart)
@@ -108,6 +115,7 @@ class DashboardActivity : AppCompatActivity() {
         //Przywitanie użytkownika
         if (userId != -1) {
             lifecycleScope.launch {
+                DashboardSyncManager.sync(this@DashboardActivity)
                 val db = AppDatabase.Companion.getDatabase(this@DashboardActivity)
                 val user = db.userDao().getUserById(userId)
                 withContext(Dispatchers.Main) {
@@ -135,7 +143,6 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         setupChartAppearance()
-        loadAndShowData()
 
         // Pobranie aktualnego miesiąca i roku
         val today = LocalDate.now()
@@ -222,6 +229,19 @@ class DashboardActivity : AppCompatActivity() {
         DashboardBudgetAlarmScheduler.scheduleDailyBudgetCheck(this)
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (firstLoadDone) return
+        firstLoadDone = true
+        lifecycleScope.launch {
+            // Najpierw sync z Supabase do Room
+            DashboardSyncManager.sync(this@DashboardActivity)
+            WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
+            // Dopiero potem odczyt z Room i rysowanie wykresu
+            loadAndShowData()
+        }
+    }
+
     private fun updateMonthLabel() {
         val monthName = Month.of(selectedMonth)
             .getDisplayName(TextStyle.FULL, Locale.forLanguageTag("pl-PL"))
@@ -302,7 +322,9 @@ class DashboardActivity : AppCompatActivity() {
                     period = settings.period,
                     savingsGoal = settings.savingsGoal,
                     categoryColors = categoryColorsJson.toString(),
-                    peopleList = settings.peopleList
+                    peopleList = settings.peopleList,
+                    defaultCategory = settings.defaultCategory,
+                    defaultPaymentMethod = settings.defaultPaymentMethod
                 )
             }
         }
@@ -391,7 +413,9 @@ class DashboardActivity : AppCompatActivity() {
                     period = settings.period,
                     savingsGoal = settings.savingsGoal,
                     categoryColors = colorsJson.toString(),
-                    peopleList = settings.peopleList
+                    peopleList = settings.peopleList,
+                    defaultCategory = settings.defaultCategory,
+                    defaultPaymentMethod = settings.defaultPaymentMethod
                 )
             }
             // Po aktualizacji ustawień - pobierz je ponownie, aby wkres miał aktualne kolory
@@ -643,6 +667,31 @@ class DashboardActivity : AppCompatActivity() {
                                 isDefault = repeat
                             )
                             monthlyBudgetDao.updateBudget(budgetForMonth)
+                        }
+                        // Supabase
+                        val supabaseUid = Prefs.getSupabaseUid(this@DashboardActivity)
+                        if (supabaseUid != null) {
+                            try {
+                                MonthlyBudgetRemoteRepository.upsertBudget(
+                                    supabaseUid = supabaseUid,
+                                    budget = budgetForMonth
+                                )
+                            } catch (e: Exception) {
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_BUDGET,
+                                        operation = SyncConstants.OP_UPDATE, // Upsert traktujemy jako update
+                                        localId = budgetForMonth.id,
+                                        remoteId = null,
+                                        payloadJson = Json.encodeToString(
+                                            MonthlyBudget.serializer(),
+                                            budgetForMonth
+                                        )
+                                    )
+                                )
+                                // Uruchom worker
+                                WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
+                            }
                         }
 
                         withContext(Dispatchers.Main) {

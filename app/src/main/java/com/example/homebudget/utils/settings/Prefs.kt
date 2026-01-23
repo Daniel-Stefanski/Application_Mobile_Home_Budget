@@ -4,6 +4,16 @@ import android.content.Context
 import android.content.SharedPreferences
 
 object Prefs {
+    private const val KEY_SUPABASE_UID = "SUPABASE_UID"
+
+    fun setSupabaseUid(context: Context, uid: String) {
+        prefs(context).edit().putString(KEY_SUPABASE_UID, uid).apply()
+    }
+
+    fun getSupabaseUid(context: Context): String? {
+        return prefs(context).getString(KEY_SUPABASE_UID, null)
+    }
+
     private const val PREF_NAME = "HomeBudgetPrefs"
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)

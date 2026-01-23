@@ -12,17 +12,19 @@ import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.data.dao.ExpenseDao
 import com.example.homebudget.data.entity.MonthlyBudget
 import com.example.homebudget.data.dao.MonthlyBudgetDao
+import com.example.homebudget.data.dao.PendingSyncDao
 import com.example.homebudget.data.entity.SavingsGoal
 import com.example.homebudget.data.dao.SavingsGoalDao
 import com.example.homebudget.data.entity.Settings
 import com.example.homebudget.data.dao.SettingsDao
 import com.example.homebudget.data.entity.User
 import com.example.homebudget.data.dao.UserDao
+import com.example.homebudget.data.entity.PendingSync
 
 //AppDatabase.kt – główna klasa Room Database łącząca wszystkie DAO.
 @Database(
-    entities = [User::class, Settings::class, Expense::class, SavingsGoal::class, MonthlyBudget::class, Contribution::class],
-    version = 45,
+    entities = [User::class, Settings::class, Expense::class, SavingsGoal::class, MonthlyBudget::class, Contribution::class, PendingSync::class],
+    version = 50,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun savingsGoalDao(): SavingsGoalDao
     abstract fun monthlyBudgetDao(): MonthlyBudgetDao
     abstract fun contributionDao(): ContributionDao
+    abstract fun pendingSyncDao(): PendingSyncDao
 
     companion object {
         @Volatile
@@ -41,24 +44,25 @@ abstract class AppDatabase : RoomDatabase() {
          * Dodaje nowe kolumny do tabeli na przykład settings
          * DANE NIE SĄ USUWANE
          */
-        private val MIGRATION_44_45 = object : Migration(44, 45) {
+        private val MIGRATION_49_50 = object : Migration(49, 50) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                val cursor = database.query("PRAGMA table_info(expenses)")
-                var hasNote = false
+                val cursor = database.query("PRAGMA table_info(pending_sync)")
+                var hasEntityType = false
                 while (cursor.moveToNext()) {
                     val columnName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
-                    if (columnName == "note") {
-                        hasNote = true
+                    if (columnName == "entityType") {
+                        hasEntityType = true
                         break
                     }
                 }
                 cursor.close()
                 // Przykład: dodanie nowej kolumny
-                if (!hasNote) {
-                    database.execSQL("ALTER TABLE expenses ADD COLUMN note TEXT ")
+                if (!hasEntityType) {
+                    database.execSQL("ALTER TABLE pending_sync ADD COLUMN entityType STRING ")
                 }
             }
         }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -66,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "home_budget_db"
                 )
-                    .addMigrations(MIGRATION_44_45)
+                    .addMigrations(MIGRATION_49_50)
                     .build()
                 INSTANCE = instance
                 instance

@@ -27,7 +27,9 @@ interface SettingsDao {
             "period = :period, " +
             "savingsGoal = :savingsGoal, " +
             "categoryColors = :categoryColors, " +
-            "peopleList = :peopleList " +
+            "peopleList = :peopleList, " +
+            "defaultCategory = :defaultCategory, " +
+            "defaultPaymentMethod = :defaultPaymentMethod " +
             "WHERE userId = :userId")
     suspend fun updateSettings(
         userId: Int,
@@ -36,6 +38,8 @@ interface SettingsDao {
         period: String,
         savingsGoal: Double,
         categoryColors: String,
-        peopleList: String
+        peopleList: String,
+        defaultCategory: String,
+        defaultPaymentMethod: String
     )
 }

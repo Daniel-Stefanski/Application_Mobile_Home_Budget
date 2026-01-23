@@ -18,14 +18,19 @@ import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
+import com.example.homebudget.data.entity.PendingSync
+import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.notifications.NotificationHelper
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.money.MoneyUtils
 import com.example.homebudget.utils.settings.Prefs
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -173,28 +178,84 @@ class AddBillActivity : AppCompatActivity() {
                 val db = AppDatabase.getDatabase(this@AddBillActivity)
                 withContext(Dispatchers.IO) {
                     if (editBillId == null) {
-                        // Dodawanie
-                        val newId = db.expenseDao().insertExpense(expense).toInt()
-                        if (expense.status == "nieopłacony") {
-                            BillsAlarmScheduler.scheduleAllRemindersForDate(this@AddBillActivity, newId, expense.date)
+                        val localId = db.expenseDao().insertExpense(expense).toInt()
+                        val supabaseUid = Prefs.getSupabaseUid(this@AddBillActivity)
+                        if (!supabaseUid.isNullOrBlank()) {
+                            try {
+                                val remoteId = ExpenseRemoteRepository.insertExpense(
+                                    supabaseUid,
+                                    expense.copy(id = localId)
+                                )
+                                db.expenseDao().updateRemoteId(localId, remoteId)
+                            } catch (e: Exception) {
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_EXPENSE,
+                                        operation = SyncConstants.OP_INSERT,
+                                        localId = localId,
+                                        remoteId = null,
+                                        payloadJson = Json.encodeToString(
+                                            Expense.serializer(),
+                                            expense.copy(id = localId)
+                                        )
+                                    )
+                                )
+                            }
                         }
                     } else {
                         // Edycja
-                        db.expenseDao().updateExpenseFull(
-                            editBillId!!,
-                            description,
-                            amount,
-                            note,
-                            selectedDate,
-                            repeatInterval
+                        // Pobierz aktualny obiekt
+                        val existingExpense = db.expenseDao().getExpenseById(editBillId!!) ?: return@withContext
+                        // Zaktualizuj lokalnie
+                        val updatedExpense = existingExpense.copy(
+                            description = description,
+                            amount = amount,
+                            note = note,
+                            date = selectedDate,
+                            repeatInterval = repeatInterval,
+                            status = statusValue
                         )
+                        db.expenseDao().updateExpense(updatedExpense)
+                        // Wyślij do Supabase
+                        val supabaseUid = Prefs.getSupabaseUid(this@AddBillActivity)
+                        if (!supabaseUid.isNullOrBlank()) {
+                            try {
+                                if (updatedExpense.remoteId != null) {
+                                    ExpenseRemoteRepository.updateExpense(
+                                        updatedExpense.remoteId!!,
+                                        updatedExpense
+                                    )
+                                } else {
+                                    val remoteId = ExpenseRemoteRepository.insertExpense(
+                                        supabaseUid,
+                                        updatedExpense
+                                    )
+                                    db.expenseDao().updateRemoteId(updatedExpense.id, remoteId)
+                                }
+                            } catch (e: Exception) {
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_EXPENSE,
+                                        operation = if (updatedExpense.remoteId == null)
+                                            SyncConstants.OP_INSERT else SyncConstants.OP_UPDATE,
+                                        localId = updatedExpense.id,
+                                        remoteId = updatedExpense.remoteId,
+                                        payloadJson = Json.encodeToString(
+                                            Expense.serializer(),
+                                            updatedExpense
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                        // Alarmy
                         BillsAlarmScheduler.cancelAllReminders(this@AddBillActivity, editBillId!!)
                         if (statusValue == "nieopłacony") {
                             BillsAlarmScheduler.scheduleAllRemindersForDate(this@AddBillActivity,editBillId!!, selectedDate)
                         }
                     }
                 }
-
+                WorkSchedulerSupabase.scheduleSupabaseSync(this@AddBillActivity)
                 // create notification channel (upewnij się, że kanał istnieje)
                 NotificationHelper.createNotificationChannel(this@AddBillActivity)
 

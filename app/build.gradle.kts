@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("kotlin-kapt")
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
 
 android {
@@ -48,6 +49,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
+    implementation("com.google.android.material:material:1.11.0")
+
     // Room components
     implementation("androidx.room:room-runtime:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
@@ -63,4 +66,15 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // Supabase
+    implementation("io.github.jan-tennert.supabase:supabase-kt:2.4.3")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.4.3")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.4.3")
+    implementation("io.github.jan-tennert.supabase:functions-kt:2.4.3")
+
+    // Ktor (wymagane)
+    implementation("io.ktor:ktor-client-okhttp:2.3.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
 }

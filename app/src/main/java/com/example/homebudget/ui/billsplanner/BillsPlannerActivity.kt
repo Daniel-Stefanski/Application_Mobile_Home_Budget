@@ -12,13 +12,18 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
+import com.example.homebudget.data.entity.PendingSync
+import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.settings.Prefs
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 //BillsPlannerActivity.kt – ekran planowania rachunków/cyklicznych płatności.
 class BillsPlannerActivity : AppCompatActivity() {
@@ -137,9 +142,30 @@ class BillsPlannerActivity : AppCompatActivity() {
             .setTitle("Usuń rachunek")
             .setMessage("Czy na pewno chcesz usunąć ten rachunek?")
             .setPositiveButton("Tak") { _, _ ->
-                val db = AppDatabase.getDatabase(this)
                 lifecycleScope.launch {
-                    db.expenseDao().unsetRecurring(expense.id)
+                    val db = AppDatabase.getDatabase(this@BillsPlannerActivity)
+                    withContext(Dispatchers.IO) {
+                        try {
+                            if (expense.remoteId != null) {
+                                ExpenseRemoteRepository.deleteExpense(expense.remoteId!!)
+                            }
+                        } catch (e: Exception) {
+                            db.pendingSyncDao().insert(
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_EXPENSE,
+                                    operation = SyncConstants.OP_DELETE,
+                                    localId = expense.id,
+                                    remoteId = expense.remoteId,
+                                    payloadJson = Json.encodeToString(
+                                        Expense.serializer(),
+                                        expense
+                                    )
+                                )
+                            )
+                        }
+                        db.expenseDao().deleteExpenseById(expense.id)
+                    }
+                    WorkSchedulerSupabase.scheduleSupabaseSync(this@BillsPlannerActivity)
                     loadRecurringBills()
                 }
             }
@@ -149,10 +175,31 @@ class BillsPlannerActivity : AppCompatActivity() {
 
     private fun onStatusChange(expense: Expense, newStatus: String) {
         val db = AppDatabase.getDatabase(this)
-
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                db.expenseDao().updateStatus(expense.id, newStatus)
+            val updateExpense = expense.copy(status = newStatus)
+            // Room
+            db.expenseDao().updateExpense(updateExpense)
+            try {
+                if (updateExpense.remoteId != null) {
+                    ExpenseRemoteRepository.updateExpense(
+                        updateExpense.remoteId!!,
+                        updateExpense
+                    )
+                }
+            } catch (e: Exception) {
+                db.pendingSyncDao().insert(
+                    PendingSync(
+                        entityType = SyncConstants.ENTITY_EXPENSE,
+                        operation = SyncConstants.OP_UPDATE,
+                        localId = updateExpense.id,
+                        remoteId = updateExpense.remoteId,
+                        payloadJson = Json.encodeToString(
+                            Expense.serializer(),
+                            updateExpense
+                        )
+                    )
+                )
+                WorkSchedulerSupabase.scheduleSupabaseSync(this@BillsPlannerActivity)
             }
 
             // jeśli ustawiliśmy na opłacony -> anuluj przypomnienia

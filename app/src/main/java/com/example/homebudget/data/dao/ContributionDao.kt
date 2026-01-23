@@ -2,6 +2,7 @@ package com.example.homebudget.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.homebudget.data.entity.Contribution
 
@@ -9,7 +10,7 @@ import com.example.homebudget.data.entity.Contribution
 @Dao
 interface ContributionDao {
     @Insert
-    suspend fun insert(contribution: Contribution)
+    suspend fun insert(contribution: Contribution): Long
 
     @Query("SELECT * FROM contributions WHERE goalId = :goalId ORDER BY timestamp DESC")
     suspend fun getContributionsForGoal(goalId: Int): List<Contribution>
@@ -20,4 +21,14 @@ interface ContributionDao {
     @Query("SELECT SUM(amount) FROM contributions WHERE goalId = :goalId AND personName = :personName")
     suspend fun getTotalForPerson(goalId: Int, personName: String): Double?
 
+    @Query("""
+    DELETE FROM contributions 
+    WHERE goalId IN (
+        SELECT id FROM savings_goals WHERE userId = :userId
+    )
+""")
+    suspend fun deleteAllForUser(userId: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(list: List<Contribution>)
 }

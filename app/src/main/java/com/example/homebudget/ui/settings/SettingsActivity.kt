@@ -27,6 +27,14 @@ import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.dao.SettingsDao
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.data.entity.PendingSync
+import com.example.homebudget.data.entity.Settings
+import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.remote.repository.MonthlyBudgetRemoteRepository
+import com.example.homebudget.data.remote.repository.SavingsRemoteRepository
+import com.example.homebudget.data.remote.repository.SettingsRemoteRepository
+import com.example.homebudget.data.remote.repository.SupabaseAccountRepository
+import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmScheduler
 import com.example.homebudget.ui.auth.LoginActivity
 import com.example.homebudget.ui.dashboard.DashboardActivity
@@ -34,9 +42,12 @@ import com.example.homebudget.utils.color.ColorPalette
 import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -406,15 +417,26 @@ class SettingsActivity : AppCompatActivity(){
                         val categoriesJson = defaultCategories.joinToString(prefix = "[", postfix = "]") {"\"$it\""}
                         val colorsJson = JSONObject(defaultColors).toString()
 
-                        settingsDao.updateSettings(
+                        val updatedSettings = Settings(
                             userId = userId,
                             categories = categoriesJson,
                             currency = "PLN",
                             period = "Miesięczny",
                             savingsGoal = 0.0,
                             categoryColors = colorsJson,
-                            peopleList =  "[]"
+                            peopleList =  "[]",
+                            defaultCategory = "Brak",
+                            defaultPaymentMethod = "Brak"
                         )
+                        saveSettingsAndSync(settingsDao, updatedSettings)
+                        // Reset danych w supabase
+                        val supabaseUid = Prefs.getSupabaseUid(this@SettingsActivity)
+                        if (!supabaseUid.isNullOrBlank()) {
+                            ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
+                            SavingsRemoteRepository.deleteAllForUser(supabaseUid)
+                            MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
+                            SettingsRemoteRepository.resetSettings(supabaseUid, updatedSettings)
+                        }
 
                         // Przywróć motyw do domyślnego (jasny)
                         Prefs.setAppTheme(this@SettingsActivity, "light")
@@ -490,21 +512,27 @@ class SettingsActivity : AppCompatActivity(){
                         .create()
                     loadingDialog.show()
                     lifecycleScope.launch {
-                        userDao.deleteUser(userId)
+                        val supabaseUid = Prefs.getSupabaseUid(this@SettingsActivity)
+                        // Usuń dane w Supabase (opcjonalnie, ale bardzo polecane)
+                        if (!supabaseUid.isNullOrBlank()) {
+                            ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
+                            SavingsRemoteRepository.deleteAllForUser(supabaseUid)
+                            MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
+                            SettingsRemoteRepository.deleteSettings(supabaseUid)
 
-                        // Wyczyść wszystkie dane z SharedPreferences
+                            // USUŃ KONTO AUTH (EDGE FUNCTION)
+                            SupabaseAccountRepository.deleteAccount(supabaseUid)
+                        }
+                        // Usuń dane lokalne
+                        userDao.deleteUser(userId)
+                        AppDatabase.getDatabase(this@SettingsActivity).clearAllTables()
+                        // Prefs
                         Prefs.resetAll(this@SettingsActivity)
 
                         withContext(Dispatchers.Main) {
-                            loadingDialog.dismiss()
-                            Toast.makeText(
-                                this@SettingsActivity,
-                                "Konto zostało usunięte",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Toast.makeText(this@SettingsActivity, "Konto zostało usunięte", Toast.LENGTH_SHORT).show()
                             val intent = Intent(this@SettingsActivity, LoginActivity::class.java)
-                            intent.flags =
-                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             startActivity(intent)
                             finish()
                         }
@@ -558,12 +586,11 @@ class SettingsActivity : AppCompatActivity(){
                             categories.add(newCategory)
                             colors.put(newCategory, String.format("#%06X", 0xFFFFFF and color))
 
-                            settingsDao.update(
-                                settings.copy(
-                                    categories = SettingsHelper.writeCategories(categories),
-                                    categoryColors = colors.toString()
-                                )
+                            val updatedSettings = settings.copy(
+                                categories = SettingsHelper.writeCategories(categories),
+                                categoryColors = colors.toString()
                             )
+                            saveSettingsAndSync(settingsDao, updatedSettings)
                             withContext(Dispatchers.Main) {
                                 Toast.makeText(
                                     context,
@@ -590,6 +617,34 @@ class SettingsActivity : AppCompatActivity(){
         dialog.show()
     }
 
+    private suspend fun saveSettingsAndSync(
+        settingsDao: SettingsDao,
+        settings: Settings
+    ) {
+        settingsDao.insertSettings(settings)
+        val supabaseUid = Prefs.getSupabaseUid(this)
+        if (!supabaseUid.isNullOrBlank()) {
+            try {
+                SettingsRemoteRepository.upsertSettings(supabaseUid, settings)
+            } catch (e: Exception) {
+                val db = AppDatabase.getDatabase(this)
+                db.pendingSyncDao().insert(
+                    PendingSync(
+                        entityType = SyncConstants.ENTITY_SETTINGS,
+                        operation = SyncConstants.OP_UPDATE,
+                        localId = settings.userId,
+                        remoteId = null,
+                        payloadJson = Json.encodeToString(
+                            Settings.serializer(),
+                            settings
+                        )
+                    )
+                )
+                WorkSchedulerSupabase.scheduleSupabaseSync(this)
+            }
+        }
+    }
+
     private fun loadCategoriesList(settingsDao: SettingsDao, userId: Int, sectionCategories: LinearLayout) {
         lifecycleScope.launch {
             val settings = settingsDao.getSettingsForUser(userId)
@@ -603,26 +658,15 @@ class SettingsActivity : AppCompatActivity(){
                 val categoriesList = SettingsHelper.getCategories(settings)
                 withContext(Dispatchers.Main) {
                     if (categoriesList.isNotEmpty()) {
-                        val categoryColorsMap = SettingsHelper.getCategoryColors(settings)
+                        val categoryColorsMap = JSONObject(settings.categoryColors)
                         val colors = categoriesList.map { cat ->
                             val hex = categoryColorsMap.optString(cat, "")
                             if (hex.isNotEmpty()) Color.parseColor(hex)
                             else {
-                                val newColor = ColorUtils.getRandomColor()
-                                categoryColorsMap.put(
-                                    cat,
-                                    String.format("#%06X", 0xFFFFFF and newColor)
-                                )
-                                newColor
+                                val hex = categoryColorsMap.optString(cat, "#9E9E9E")
+                                Color.parseColor(hex)
                             }
                         }
-
-                        //Zaktualizuj bazę, jeśli doszły nowe kolory
-                        settingsDao.update(
-                            settings.copy(
-                                categoryColors = categoryColorsMap.toString()
-                            )
-                        )
 
                         categoriesList.forEachIndexed { index, category ->
                             val row = LinearLayout(context).apply {
@@ -691,15 +735,13 @@ class SettingsActivity : AppCompatActivity(){
                                                         val currentSettings =
                                                             settingsDao.getSettingsForUser(userId)
                                                         if (currentSettings != null) {
-                                                            val categoryColors =
-                                                                JSONObject(currentSettings.categoryColors)
+                                                            val categoryColors = JSONObject(currentSettings.categoryColors)
                                                             categoryColors.put(category, hex)
 
-                                                            settingsDao.update(
-                                                                currentSettings.copy(
-                                                                    categoryColors = categoryColors.toString()
-                                                                )
+                                                            val updatedSettings = currentSettings.copy(
+                                                                categoryColors = categoryColors.toString()
                                                             )
+                                                            saveSettingsAndSync(settingsDao, updatedSettings)
 
                                                             withContext(Dispatchers.Main) {
                                                                 Toast.makeText(
@@ -794,11 +836,10 @@ class SettingsActivity : AppCompatActivity(){
                                                     }
 
                                                     //Zaktualizuj bazę, jeśli usunięto kategorię
-                                                    settingsDao.update(
-                                                        currentSettings.copy(
-                                                            categories = updatedCategories
-                                                        )
+                                                    val updatedSettings = currentSettings.copy(
+                                                        categories = updatedCategories
                                                     )
+                                                    saveSettingsAndSync(settingsDao, updatedSettings)
 
                                                     withContext(Dispatchers.Main) {
                                                         Toast.makeText(
@@ -883,11 +924,10 @@ class SettingsActivity : AppCompatActivity(){
                         val updatedPeople = existing.toMutableList()
                         updatedPeople.add(newPerson)
 
-                        settingsDao.update(
-                            settings.copy(
-                                peopleList = SettingsHelper.writePeople(updatedPeople)
-                            )
+                        val updatedSettings = settings.copy(
+                            peopleList = SettingsHelper.writePeople(updatedPeople)
                         )
+                        saveSettingsAndSync(settingsDao, updatedSettings)
 
                         withContext(Dispatchers.Main) {
                             Toast.makeText(context, "Dodano osobę: $newPerson", Toast.LENGTH_SHORT)
@@ -963,13 +1003,11 @@ class SettingsActivity : AppCompatActivity(){
                                                     val people =
                                                         SettingsHelper.getPeople(currentSettings)
                                                     people.remove(name)
-                                                    settingsDao.update(
-                                                        currentSettings.copy(
-                                                            peopleList = SettingsHelper.writePeople(
-                                                                people
-                                                            )
-                                                        )
+                                                    val updatedSettings = currentSettings.copy(
+                                                        peopleList = SettingsHelper.writePeople(people)
                                                     )
+                                                    saveSettingsAndSync(settingsDao, updatedSettings)
+
                                                     withContext(Dispatchers.Main) {
                                                         Toast.makeText(
                                                             context,
@@ -1023,6 +1061,8 @@ class SettingsActivity : AppCompatActivity(){
     private fun loadPreferencesData(settingsDao: SettingsDao) {
         val spinnerCategory = findViewById<Spinner>(R.id.spinnerDefaultCategory)
         val spinnerPayment = findViewById<Spinner>(R.id.spinnerDefaultPayment)
+        var isInitializingCategory = true
+        var isInitializingPayment = true
         lifecycleScope.launch {
             val settings = settingsDao.getSettingsForUser(userId)
             // Kategoria z bazy + brak
@@ -1039,17 +1079,30 @@ class SettingsActivity : AppCompatActivity(){
             catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerCategory.adapter = catAdapter
             // Odczyt zapisanej kategorii
-            val savedCategory = Prefs.getDefaultCategory(this@SettingsActivity)
-            val catIndex = categories.indexOf(savedCategory)
-            if (catIndex >= 0) spinnerCategory.setSelection(catIndex)
-            spinnerCategory.setOnItemSelectedListener(object :
-            AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>, view: View, position: Int, id: Long) {
-                    Prefs.setDefaultCategory(this@SettingsActivity, categories[position])
+            if (settings != null) {
+                val index = categories.indexOf(settings.defaultCategory)
+                if (index >= 0) spinnerCategory.setSelection(index)
+            }
+            spinnerCategory.onItemSelectedListener =
+                object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(
+                        parent: AdapterView<*>, view: View, position: Int, id: Long
+                    ) {
+                        if (isInitializingCategory) {
+                            isInitializingCategory = false
+                            return
+                        }
+                        lifecycleScope.launch {
+                            val current = settingsDao.getSettingsForUser(userId) ?: return@launch
+                            val updated = current.copy(
+                                defaultCategory = categories[position]
+                            )
+                            saveSettingsAndSync(settingsDao, updated)
+                        }
+                    }
+                    override fun onNothingSelected(parent: AdapterView<*>) {}
                 }
 
-                override fun onNothingSelected(parent: AdapterView<*>) {}
-            })
             //Metody płatności
             val payments = listOf("Brak", "Gotówka", "Karta", "Blik", "Przelew")
             val payAdapter =
@@ -1057,17 +1110,29 @@ class SettingsActivity : AppCompatActivity(){
             payAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerPayment.adapter = payAdapter
             // Odczyt zapisanej płatności
-            val savedPayment = Prefs.getDefaultPayment(this@SettingsActivity)
-            val payIndex = payments.indexOf(savedPayment)
-            if (payIndex >= 0) spinnerPayment.setSelection(payIndex)
-            spinnerPayment.setOnItemSelectedListener(object :
-            AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>, view: View, position: Int, id: Long) {
-                    Prefs.setDefaultPayment(this@SettingsActivity, payments[position])
+            if (settings != null) {
+                val index = payments.indexOf(settings.defaultPaymentMethod)
+                if (index >= 0) spinnerPayment.setSelection(index)
+            }
+            spinnerPayment.onItemSelectedListener =
+                object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(
+                        parent: AdapterView<*>, view: View, position: Int, id: Long
+                    ) {
+                        if (isInitializingPayment) {
+                            isInitializingPayment = false
+                            return
+                        }
+                        lifecycleScope.launch {
+                            val current = settingsDao.getSettingsForUser(userId) ?: return@launch
+                            val updated = current.copy(
+                                defaultPaymentMethod = payments[position]
+                            )
+                            saveSettingsAndSync(settingsDao, updated)
+                        }
+                    }
+                    override fun onNothingSelected(parent: AdapterView<*>) {}
                 }
-
-                override fun onNothingSelected(parent: AdapterView<*>) {}
-            })
         }
     }
 

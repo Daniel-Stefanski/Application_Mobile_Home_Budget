@@ -5,6 +5,8 @@ import com.example.homebudget.data.remote.SupabaseClient
 import com.example.homebudget.data.remote.dto.ExpenseRemoteDto
 import com.example.homebudget.data.remote.dto.ExpenseRemoteReadDto
 import io.github.jan.supabase.postgrest.from
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object ExpenseRemoteRepository {
 
@@ -41,22 +43,31 @@ object ExpenseRemoteRepository {
             }
     }
 
-    suspend fun updateExpense(remoteId: Long, expense: Expense) {
-        SupabaseClient.client
+    suspend fun updateExpense(supabaseUid: String, remoteId: Long, expense: Expense): ExpenseRemoteReadDto {
+        // select() po update wymusi informację zwrotną czy coś się zmieniło
+        val payload = buildJsonObject {
+            put("description", expense.description ?: "")
+            put("amount", expense.amount)
+            put("note",expense.note ?: "")
+            put("date", expense.date)
+            put("repeat_interval", expense.repeatInterval)
+            put("status", expense.status)
+            put("last_reset", expense.lastReset)
+        }
+        val updated = SupabaseClient.client
             .from("expenses")
-            .update(
-                mapOf(
-                    "description" to expense.description,
-                    "amount" to expense.amount,
-                    "note" to expense.note,
-                    "date" to expense.date,
-                    "repeat_interval" to expense.repeatInterval,
-                    "status" to expense.status,
-                    "last_reset" to expense.lastReset
-                )
-            ) {
-                filter { eq("id", remoteId) }
+            .update(payload) {
+                filter {
+                    eq("id", remoteId)
+                    eq("user_id", supabaseUid)
+                }
+                select()
             }
+            .decodeList<ExpenseRemoteReadDto>()
+        if (updated.isEmpty()) {
+            throw IllegalStateException("UPDATE w Supabase zmienił 0 wierszy (remoteId=$remoteId")
+        }
+        return updated.first()
     }
 
     suspend fun deleteExpense(remoteId: Long) {

@@ -54,6 +54,8 @@ class AddExpenseActivity : AppCompatActivity() {
     private lateinit var layoutCycle: LinearLayout
     private lateinit var spinnerCycle: Spinner
     private var selectedDate: Long = System.currentTimeMillis()
+    private var defaultCategoryIndex: Int = 0
+    private var defaultPaymentIndex: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,7 +135,8 @@ class AddExpenseActivity : AppCompatActivity() {
                 // Ustawienie wartości domyślnej z ustawień
                 val defaultCategory = settings?.defaultCategory ?: "Brak"
                 val index = categories.indexOf(defaultCategory)
-                categorySpinner.setSelection(if (index >= 0) index else 0)
+                defaultCategoryIndex = if (index >= 0) index else 0
+                categorySpinner.setSelection(defaultCategoryIndex)
             }
         }
     }
@@ -152,7 +155,8 @@ class AddExpenseActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 val defaultPayment = settings?.defaultPaymentMethod ?: "Brak"
                 val index = payments.indexOf(defaultPayment)
-                paymentSpinner.setSelection(if (index >= 0) index else 0)
+                defaultPaymentIndex = if (index >= 0) index else 0
+                paymentSpinner.setSelection(defaultPaymentIndex)
             }
         }
     }
@@ -238,7 +242,19 @@ class AddExpenseActivity : AppCompatActivity() {
     private fun setupErrorBorders() {
         val normalBorder = R.drawable.shape_search_border
         val errorBorder = R.drawable.shape_search_border_error
-
+        // Kwota
+        amountInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val text = amountInput.text.toString()
+                // Jeśli użytkownik zostawił "12," -> Nie formatuj oraz zabezpieczeni przed NULL
+                if (text.isBlank() || text.endsWith(",")) return@setOnFocusChangeListener
+                val value = MoneyUtils.parseAmount(text) ?: return@setOnFocusChangeListener
+                // Tylko walidacja
+                if (value <= 0) {
+                    amountInput.error = "Podaj prawidłową kwotę"
+                }
+            }
+        }
         // Opis
         descriptionInput.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
@@ -276,20 +292,6 @@ class AddExpenseActivity : AppCompatActivity() {
             Toast.makeText(this, "Błąd: brak zalogowanego użytkownika", Toast.LENGTH_SHORT).show()
             return
         }
-        // Kwota
-        amountInput.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val text = amountInput.text.toString()
-                // Jeśli użytkownik zostawił "12," -> Nie formatuj oraz zabezpieczeni przed NULL
-                if (text.isBlank() || text.endsWith(",")) return@setOnFocusChangeListener
-                val value = MoneyUtils.parseAmount(text) ?: return@setOnFocusChangeListener
-                // Tylko walidacja
-                if (value <= 0) {
-                    amountInput.error = "Podaj prawidłową kwotę"
-                }
-            }
-        }
-
         val amount = MoneyUtils.parseAmount(amountInput.text.toString())
             ?: run {
                 amountInput.error = "Podaj prawidłową kwotę"
@@ -382,13 +384,14 @@ class AddExpenseActivity : AppCompatActivity() {
         amountInput.text.clear()
         descriptionInput.text.clear()
         noteInput.text.clear()
-        categorySpinner.setSelection(0)
-        paymentSpinner.setSelection(0)
+        categorySpinner.setSelection(defaultCategoryIndex)
+        paymentSpinner.setSelection(defaultPaymentIndex)
+        personSpinner.setSelection(0, false) // "Ja" (opcjonalnie, jeśli chcesz reset)
         recurringCheckBox.isChecked = false
         spinnerCycle.setSelection(0)
         layoutCycle.visibility = LinearLayout.GONE
         selectedDate = System.currentTimeMillis()
         updateDateButton()
-        saveButton.isEnabled = false
+        validateForm()
     }
 }

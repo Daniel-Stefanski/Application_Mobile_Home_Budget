@@ -3,6 +3,7 @@ package com.example.homebudget.ui.billsplanner
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.*
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -175,43 +176,71 @@ class BillsPlannerActivity : AppCompatActivity() {
 
     private fun onStatusChange(expense: Expense, newStatus: String) {
         val db = AppDatabase.getDatabase(this)
+
         lifecycleScope.launch {
-            val updateExpense = expense.copy(status = newStatus)
-            // Room
-            db.expenseDao().updateExpense(updateExpense)
-            try {
-                if (updateExpense.remoteId != null) {
-                    ExpenseRemoteRepository.updateExpense(
-                        updateExpense.remoteId!!,
-                        updateExpense
-                    )
-                }
-            } catch (e: Exception) {
-                db.pendingSyncDao().insert(
-                    PendingSync(
-                        entityType = SyncConstants.ENTITY_EXPENSE,
-                        operation = SyncConstants.OP_UPDATE,
-                        localId = updateExpense.id,
-                        remoteId = updateExpense.remoteId,
-                        payloadJson = Json.encodeToString(
-                            Expense.serializer(),
-                            updateExpense
+            val updatedExpense = expense.copy(status = newStatus)
+
+            withContext(Dispatchers.IO) {
+                // 1) Zapis lokalny
+                db.expenseDao().updateExpense(updatedExpense)
+
+                val supabaseUid = Prefs.getSupabaseUid(this@BillsPlannerActivity)
+
+                // 2) Sync do chmury albo kolejka PendingSync
+                if (!supabaseUid.isNullOrBlank()) {
+                    try {
+                        if (updatedExpense.remoteId != null) {
+                            // UPDATE w Supabase
+                            ExpenseRemoteRepository.updateExpense(supabaseUid = supabaseUid, remoteId = updatedExpense.remoteId!!, expense = updatedExpense)
+                        } else {
+                            // Rekord nie ma remoteId -> trzeba go "wprowadzić" do Supabase
+                            val remoteId = ExpenseRemoteRepository.insertExpense(supabaseUid, updatedExpense)
+                            db.expenseDao().updateRemoteId(updatedExpense.id, remoteId)
+                        }
+                    } catch (e: Exception) {
+                        // Jak remoteId null -> to tak naprawdę "insert" do chmury
+                        val op = if (updatedExpense.remoteId == null)
+                            SyncConstants.OP_INSERT else SyncConstants.OP_UPDATE
+
+                        db.pendingSyncDao().insert(
+                            PendingSync(
+                                entityType = SyncConstants.ENTITY_EXPENSE,
+                                operation = op,
+                                localId = updatedExpense.id,
+                                remoteId = updatedExpense.remoteId,
+                                payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
+                            )
+                        )
+                        // Dodaj log żeby widzieć realny błąd:
+                        Log.e("BILLS", "Supabase status update FAILED", e)
+                    }
+                } else {
+                    // Brak UID -> też dobrze jest zakolejkować, jeśli traktujesz chmurę jako źródło prawdy
+                    db.pendingSyncDao().insert(
+                        PendingSync(
+                            entityType = SyncConstants.ENTITY_EXPENSE,
+                            operation = SyncConstants.OP_UPDATE,
+                            localId = updatedExpense.id,
+                            remoteId = updatedExpense.remoteId,
+                            payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
                         )
                     )
-                )
-                WorkSchedulerSupabase.scheduleSupabaseSync(this@BillsPlannerActivity)
+                }
             }
 
-            // jeśli ustawiliśmy na opłacony -> anuluj przypomnienia
+            // 3) Zawsze planuj worker sync — nie tylko w catch
+            WorkSchedulerSupabase.scheduleSupabaseSync(this@BillsPlannerActivity)
+
+            // 4) Alarmy
             if (newStatus == "opłacony") {
                 BillsAlarmScheduler.cancelAllReminders(this@BillsPlannerActivity, expense.id)
             } else {
-                // jeśli ustawiliśmy na nieopłacony -> zaplanuj przypomnienia, ale najpierw sprawdź ustawienia
                 val notificationsEnabled = Prefs.isNotificationsEnabled(this@BillsPlannerActivity)
                 if (notificationsEnabled) {
                     BillsAlarmScheduler.scheduleAllRemindersForDate(this@BillsPlannerActivity, expense.id, expense.date)
                 }
             }
+
             loadRecurringBills()
             Toast.makeText(this@BillsPlannerActivity, "Status zamieniono na $newStatus.", Toast.LENGTH_SHORT).show()
         }

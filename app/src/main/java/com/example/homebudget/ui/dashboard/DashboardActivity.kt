@@ -458,8 +458,10 @@ class DashboardActivity : AppCompatActivity() {
                 displayCategories.add(categoryName)
             }
 
+            val NO_DATA_COLOR = Color.parseColor("#8FEAFF")
             val hasAnyValue = entries.any { it.value > 0f }
-            if (!hasAnyValue) {
+            val isNoData = !hasAnyValue
+            if (isNoData) {
                 entries.clear()
                 entries.add(PieEntry(1f, "Brak wydatków"))
             }
@@ -468,10 +470,14 @@ class DashboardActivity : AppCompatActivity() {
             dataSet.sliceSpace = 3f
             dataSet.selectionShift = 8f
 
-            val colors = entries.map { entry ->
-                val hex = categoryColorsMap.optString(entry.label, "")
-                if (hex.isNotEmpty()) Color.parseColor(hex)
-                else ColorUtils.getRandomColor()
+            val colors = if (isNoData) {
+                listOf(NO_DATA_COLOR)
+            } else {
+                entries.map { entry ->
+                    val hex = categoryColorsMap.optString(entry.label, "")
+                    if (hex.isNotEmpty()) Color.parseColor(hex)
+                    else ColorUtils.getRandomColor()
+                }
             }
             dataSet.colors = colors
 

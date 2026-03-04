@@ -6,6 +6,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 
@@ -33,10 +34,6 @@ class DailyResetWorker(context: Context, workerParams: WorkerParameters)
                 val timeSinceLastReset = System.currentTimeMillis() - expense.lastReset
                 val twentyHours = 20 * 60 * 60 * 1000L
                 if (timeSinceLastReset < twentyHours) {
-                    Log.d(
-                        "DailyResetWorker",
-                        "Pomijam reset – wykonano niedawno (ID=${expense.id})"
-                    )
                     return@forEach
                 }
 
@@ -64,17 +61,18 @@ class DailyResetWorker(context: Context, workerParams: WorkerParameters)
                     // Room
                     expenseDao.updateExpense(updatedExpense)
                     // Supabase
-                    if (updatedExpense.remoteId != null) {
+                    val supabaseUid = Prefs.getSupabaseUid(applicationContext)
+                    if (!supabaseUid.isNullOrBlank() && updatedExpense.remoteId != null) {
                         ExpenseRemoteRepository.updateExpense(
-                            updatedExpense.remoteId!!,
-                            updatedExpense
+                            supabaseUid = supabaseUid,
+                            remoteId = updatedExpense.remoteId!!,
+                            expense = updatedExpense
                         )
                     }
-                    Log.d("DailyResetWorker", "Reset wykonany dla ID=${expense.id}")
+                    Log.d("DailyResetWorker", "CHECK id=${expense.id} remoteId=${expense.remoteId} monthsPassed=$monthsPassed repeat=${expense.repeatInterval} statusBefor=${expense.status}")
                 }
             }
         }
-
         return Result.success()
     }
 }

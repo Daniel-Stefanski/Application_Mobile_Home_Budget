@@ -222,14 +222,12 @@ class AddBillActivity : AppCompatActivity() {
                             try {
                                 if (updatedExpense.remoteId != null) {
                                     ExpenseRemoteRepository.updateExpense(
-                                        updatedExpense.remoteId!!,
-                                        updatedExpense
+                                        supabaseUid = supabaseUid,
+                                        remoteId = updatedExpense.remoteId!!,
+                                        expense = updatedExpense
                                     )
                                 } else {
-                                    val remoteId = ExpenseRemoteRepository.insertExpense(
-                                        supabaseUid,
-                                        updatedExpense
-                                    )
+                                    val remoteId = ExpenseRemoteRepository.insertExpense(supabaseUid, updatedExpense)
                                     db.expenseDao().updateRemoteId(updatedExpense.id, remoteId)
                                 }
                             } catch (e: Exception) {

@@ -47,7 +47,11 @@ class SupabaseSyncWorker(
                                 val rid = item.remoteId
                                     ?: expense.remoteId
                                     ?: throw IllegalStateException("Brak remoteId dla UPDATE expense")
-                                ExpenseRemoteRepository.updateExpense(rid, expense)
+                                ExpenseRemoteRepository.updateExpense(
+                                    supabaseUid = supabaseUid,
+                                    remoteId = rid,
+                                    expense = expense
+                                )
                             }
 
                             SyncConstants.OP_DELETE -> {

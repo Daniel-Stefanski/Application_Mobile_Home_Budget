@@ -51,6 +51,7 @@ object ExpenseRemoteRepository {
             put("note",expense.note ?: "")
             put("date", expense.date)
             put("repeat_interval", expense.repeatInterval)
+            put("is_recurring", expense.isRecurring)
             put("status", expense.status)
             put("last_reset", expense.lastReset)
         }
@@ -65,7 +66,7 @@ object ExpenseRemoteRepository {
             }
             .decodeList<ExpenseRemoteReadDto>()
         if (updated.isEmpty()) {
-            throw IllegalStateException("UPDATE w Supabase zmienił 0 wierszy (remoteId=$remoteId")
+            throw IllegalStateException("UPDATE w Supabase zmienił 0 wierszy (remoteId=$remoteId)")
         }
         return updated.first()
     }

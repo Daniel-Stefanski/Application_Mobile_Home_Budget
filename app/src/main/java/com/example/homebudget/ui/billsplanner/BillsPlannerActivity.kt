@@ -137,37 +137,48 @@ class BillsPlannerActivity : AppCompatActivity() {
     }
 
     private fun deleteBill(expense: Expense) {
-        BillsAlarmScheduler.cancelAllReminders(this@BillsPlannerActivity, expense.id)
 
         AlertDialog.Builder(this)
-            .setTitle("Usuń rachunek")
-            .setMessage("Czy na pewno chcesz usunąć ten rachunek?")
+            .setTitle("Usuń z planowania rachunków")
+            .setMessage("Czy na pewno chcesz usunąć ten rachunek z planowania?")
             .setPositiveButton("Tak") { _, _ ->
                 lifecycleScope.launch {
                     val db = AppDatabase.getDatabase(this@BillsPlannerActivity)
                     withContext(Dispatchers.IO) {
-                        try {
-                            if (expense.remoteId != null) {
-                                ExpenseRemoteRepository.deleteExpense(expense.remoteId!!)
-                            }
-                        } catch (e: Exception) {
-                            db.pendingSyncDao().insert(
-                                PendingSync(
-                                    entityType = SyncConstants.ENTITY_EXPENSE,
-                                    operation = SyncConstants.OP_DELETE,
-                                    localId = expense.id,
-                                    remoteId = expense.remoteId,
-                                    payloadJson = Json.encodeToString(
-                                        Expense.serializer(),
-                                        expense
+                        // anuluj alarmy
+                        BillsAlarmScheduler.cancelAllReminders(this@BillsPlannerActivity, expense.id)
+                        // zmień tylko flagę
+                        val updatedExpense = expense.copy(isRecurring = false)
+                        db.expenseDao().updateExpense(updatedExpense)
+                        val supabaseUid = Prefs.getSupabaseUid(this@BillsPlannerActivity)
+                        if (!supabaseUid.isNullOrBlank()) {
+                            try {
+                                if (updatedExpense.remoteId != null) {
+                                    ExpenseRemoteRepository.updateExpense(
+                                        supabaseUid = supabaseUid,
+                                        remoteId = updatedExpense.remoteId!!,
+                                        expense = updatedExpense
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                db.pendingSyncDao().insert(
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_EXPENSE,
+                                        operation = SyncConstants.OP_UPDATE,
+                                        localId = updatedExpense.id,
+                                        remoteId = updatedExpense.remoteId,
+                                        payloadJson = Json.encodeToString(
+                                            Expense.serializer(),
+                                            updatedExpense
+                                        )
                                     )
                                 )
-                            )
+                            }
                         }
-                        db.expenseDao().deleteExpenseById(expense.id)
                     }
                     WorkSchedulerSupabase.scheduleSupabaseSync(this@BillsPlannerActivity)
                     loadRecurringBills()
+                    Toast.makeText(this@BillsPlannerActivity, "Rachunek usunięty z planera", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Anuluj", null)

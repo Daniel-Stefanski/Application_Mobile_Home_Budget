@@ -51,7 +51,7 @@ object Prefs {
     }
 
     // Motyw aplikacji
-    private const val  APP_THEME = "APP_THEME" // "light", "night", "system"
+    private const val  APP_THEME = "APP_THEME" // "light", "dark", "system"
     fun getAppTheme(context: Context): String =
         prefs(context).getString(APP_THEME, "system") ?: "system"
 

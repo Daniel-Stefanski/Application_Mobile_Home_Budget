@@ -31,6 +31,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="🏷️ Opis"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
             android:layout_marginTop="8dp"/>
@@ -51,6 +52,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="💰 Kwota"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
             android:layout_marginTop="8dp"/>
@@ -59,7 +61,7 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:hint="Wprowadź kwotę"
-            android:inputType="numberDecimal"
+            android:inputType="textVisiblePassword"
             android:background="@drawable/shape_search_border"
             android:padding="10dp"
             android:imeOptions="actionNext"
@@ -71,6 +73,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="📝 Notatka (opcjonalna)"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
             android:layout_marginTop="8dp"/>
@@ -92,15 +95,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="📅 Termin płatności"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
             android:layout_marginTop="8dp"/>
-        <TextView
-            android:id="@+id/textSelectedDate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Wybrana data:"
-            android:layout_marginBottom="8dp"/>
         <Button
             android:id="@+id/buttonSelectDate"
             android:layout_width="match_parent"
@@ -116,6 +114,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="🔁 Powtarzanie rachunku"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
             android:layout_marginTop="12dp"/>
@@ -166,7 +165,8 @@
                 android:text="💾 Zapisz"
                 android:textColor="@color/buttonText"
                 android:backgroundTint="@color/buttonBackground"
-                android:elevation="4dp"/>
+                android:elevation="4dp"
+                android:enabled="false"/>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

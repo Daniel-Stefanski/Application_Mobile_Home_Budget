@@ -5,7 +5,6 @@ import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.text.InputFilter
-import android.util.Log
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -27,6 +26,7 @@ import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.locale.LocaleUtils
+import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.money.MoneyUtils
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
@@ -245,14 +245,31 @@ class AddExpenseActivity : AppCompatActivity() {
         // Kwota
         amountInput.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
-                val text = amountInput.text.toString()
-                // Jeśli użytkownik zostawił "12," -> Nie formatuj oraz zabezpieczeni przed NULL
-                if (text.isBlank() || text.endsWith(",")) return@setOnFocusChangeListener
-                val value = MoneyUtils.parseAmount(text) ?: return@setOnFocusChangeListener
-                // Tylko walidacja
-                if (value <= 0) {
+                val text = amountInput.text.toString().trim()
+
+                if (text.isBlank()) {
+                    amountInput.setBackgroundResource(errorBorder)
+                    amountInput.error = "Podaj prawidłową kwotę"
+                    return@setOnFocusChangeListener
+                }
+                // Jeśli użytkownik zostawił np. "12" to dopisz 00
+                val normalizedText = when {
+                    text.endsWith(",") -> text + "00"
+                    text.contains(",") && text.substringAfter(",").length == 1 -> text + "0"
+                    else -> text
+                }
+                val value = MoneyUtils.parseAmount(normalizedText)
+                if (value != null && value > 0) {
+                    amountInput.setText(MoneyFormatter.format(value))
+                    amountInput.setSelection(amountInput.text.length)
+                    amountInput.setBackgroundResource(normalBorder)
+                    amountInput.error = null
+                } else {
+                    amountInput.setBackgroundResource(errorBorder)
                     amountInput.error = "Podaj prawidłową kwotę"
                 }
+            } else {
+                amountInput.setBackgroundResource(normalBorder)
             }
         }
         // Opis
@@ -297,7 +314,7 @@ class AddExpenseActivity : AppCompatActivity() {
                 amountInput.error = "Podaj prawidłową kwotę"
                 return
             }
-        if (amount == null || amount <= 0) {
+        if (amount <= 0) {
             amountInput.error = "Podaj prawidłową kwotę"
             return
         }

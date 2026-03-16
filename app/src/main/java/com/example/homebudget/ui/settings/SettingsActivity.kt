@@ -513,28 +513,45 @@ class SettingsActivity : AppCompatActivity(){
                     loadingDialog.show()
                     lifecycleScope.launch {
                         val supabaseUid = Prefs.getSupabaseUid(this@SettingsActivity)
-                        // Usuń dane w Supabase (opcjonalnie, ale bardzo polecane)
-                        if (!supabaseUid.isNullOrBlank()) {
-                            ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
-                            SavingsRemoteRepository.deleteAllForUser(supabaseUid)
-                            MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
-                            SettingsRemoteRepository.deleteSettings(supabaseUid)
+                        try {
+                            // Usuń dane w Supabase (opcjonalnie, ale bardzo polecane)
+                            if (!supabaseUid.isNullOrBlank()) {
+                                ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
+                                SavingsRemoteRepository.deleteAllForUser(supabaseUid)
+                                MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
+                                SettingsRemoteRepository.deleteSettings(supabaseUid)
 
-                            // USUŃ KONTO AUTH (EDGE FUNCTION)
-                            SupabaseAccountRepository.deleteAccount(supabaseUid)
-                        }
-                        // Usuń dane lokalne
-                        userDao.deleteUser(userId)
-                        AppDatabase.getDatabase(this@SettingsActivity).clearAllTables()
-                        // Prefs
-                        Prefs.resetAll(this@SettingsActivity)
+                                // USUŃ KONTO AUTH (EDGE FUNCTION)
+                                SupabaseAccountRepository.deleteAccount(supabaseUid)
+                            }
+                            // Usuń dane lokalne
+                            userDao.deleteUser(userId)
+                            AppDatabase.getDatabase(this@SettingsActivity).clearAllTables()
+                            // Prefs
+                            Prefs.resetAll(this@SettingsActivity)
 
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@SettingsActivity, "Konto zostało usunięte", Toast.LENGTH_SHORT).show()
-                            val intent = Intent(this@SettingsActivity, LoginActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            startActivity(intent)
-                            finish()
+                            withContext(Dispatchers.Main) {
+                                loadingDialog.dismiss()
+                                Toast.makeText(
+                                    this@SettingsActivity,
+                                    "Konto zostało usunięte",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                val intent =
+                                    Intent(this@SettingsActivity, LoginActivity::class.java)
+                                intent.flags =
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                startActivity(intent)
+                                finish()
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                loadingDialog.dismiss()
+                                Toast.makeText(
+                                    this@SettingsActivity, "Błąd usuwania konta. Spróbuj ponownie.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
                         }
                     }
                 }

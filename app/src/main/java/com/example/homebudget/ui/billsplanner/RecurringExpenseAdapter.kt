@@ -66,8 +66,18 @@ class RecurringExpenseAdapter(
 
         //Formatowanie daty
         val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-        val daysInfo = getDaysInfo(bill.date)
-        holder.textDate.text = "Termin płatności: ${sdf.format(Date(bill.date))} $daysInfo"
+        val dateText = "Termin płatności: ${sdf.format(Date(bill.date))}"
+
+        val daysInfo = if (bill.status =="nieopłacony") {
+            getDaysInfo(bill.date)
+        } else {
+            ""
+        }
+        holder.textDate.text = if (daysInfo.isNotBlank()) {
+            "$dateText $daysInfo"
+        } else {
+            dateText
+        }
 
         val intervalText = when (bill.repeatInterval) {
             1 -> "co miesiąc"
@@ -86,6 +96,7 @@ class RecurringExpenseAdapter(
         } else {
             holder.buttonMarkPaid.visibility = View.GONE
         }
+
         holder.textStatus.text = "Status: ${bill.status.replaceFirstChar { it.uppercase() }}"
         val statusColor = getStatusColor(context, bill.status)
         holder.textStatus.setTextColor(statusColor)

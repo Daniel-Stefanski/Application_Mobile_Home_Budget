@@ -526,10 +526,16 @@ class DashboardActivity : AppCompatActivity() {
             } else 0.0
 
             //Text wewnątrz koła
-            val centerText = "Łącznie wydano:\n${String.Companion.format(Locale.forLanguageTag("pl-PL"), "%.1f%%", percentUsed)}"
+            val centerText = if (isNoData) {
+                "Brak danych\nwprowadzonych"
+            } else {
+                "Łącznie wydano:\n${String.Companion.format(Locale.forLanguageTag("pl-PL"), "%.1f%%", percentUsed)}"
+            }
             pieChart.centerText = centerText
-            pieChart.setCenterTextSize(16f) //większy rozmiar czcionki
+            pieChart.setCenterTextSize(if (isNoData) 15f else 16f) //większy rozmiar czcionki
             val centerTextColor = when {
+                isNoData && isDarkMode -> Color.WHITE
+                isNoData && !isDarkMode -> Color.BLACK
                 percentUsed >= 100 -> Color.parseColor("#E74C3C") // Czerwony
                 isDarkMode -> Color.WHITE
                 else -> Color.BLACK

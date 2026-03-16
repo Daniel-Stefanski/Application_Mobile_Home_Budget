@@ -14,6 +14,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
+import android.text.InputFilter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -37,7 +38,6 @@ import com.google.android.material.color.MaterialColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import java.util.Calendar
@@ -141,21 +141,95 @@ class SavingsActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun setupMoneyInput(editText: EditText, requirePositive: Boolean = true) {
+        val normalBorder = R.drawable.shape_search_border
+        val errorBorder = R.drawable.shape_search_border_error
+
+        //Blokada kropki i dopuszczenie tylko przecinka + max 2 miejsca po przecinku
+        editText.filters = arrayOf(
+            InputFilter { source, start, end, dest, dstart, dend ->
+                val newText = StringBuilder(dest)
+                    .replace(dstart, dend, source.subSequence(start, end).toString())
+                    .toString()
+
+                val regex = Regex("^\\d+(?: ?\\d{0,3})*(?:,\\d{0,2})?$")
+                if (newText.isEmpty() || newText.matches(regex)) null else ""
+            }
+        )
+
+        editText.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val text = editText.text.toString().trim()
+
+                if (text.isBlank()) {
+                    editText.setBackgroundResource(errorBorder)
+                    editText.error = "Podaj prawidłową kwotę"
+                    return@setOnFocusChangeListener
+                }
+
+                val normalizedText = when {
+                    text.endsWith(",") -> text + "00"
+                    text.contains(",") && text.substringAfter(",").length == 1 -> text + "0"
+                    else -> text
+                }
+
+                val value = MoneyUtils.parseAmount(normalizedText)
+                val isValid = if (requirePositive) {
+                    value != null && value > 0
+                } else {
+                    value != null
+                }
+
+                if (isValid) {
+                    editText.setText(MoneyFormatter.format(value!!))
+                    editText.setSelection(editText.text.length)
+                    editText.setBackgroundResource(normalBorder)
+                    editText.error = null
+                } else {
+                    editText.setBackgroundResource(errorBorder)
+                    editText.error = "Podaj prawidłową kwotę"
+                }
+            } else {
+                editText.setBackgroundResource(normalBorder)
+            }
+        }
+    }
+
     // ---------------------- DODAWANIE CELU Z DATĄ ----------------------
     private fun showAddGoalDialog() {
         selectedEndDate = null
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
 
-        val inputTitle = EditText(this)
-        inputTitle.hint = "Nazwa celu"
+        val inputTitle = EditText(this).apply {
+            hint = "Nazwa celu"
+        }
         layout.addView(inputTitle)
 
-        val inputAmount = EditText(this)
-        inputAmount.hint = "Kwota docelowa"
-        inputAmount.inputType =
-            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        val inputAmount = EditText(this).apply {
+            hint = "Kwota docelowa"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
         layout.addView(inputAmount)
+        setupMoneyInput(inputAmount)
+
+        fun isTitleValid(): Boolean {
+            return inputTitle.text.toString().trim().isNotEmpty()
+        }
+
+        fun updateFieldErrorState(field: EditText, isValid: Boolean) {
+            if (isValid) {
+                field.setBackgroundResource(R.drawable.shape_search_border)
+            } else {
+                field.setBackgroundResource(R.drawable.shape_search_border_error)
+            }
+        }
+
+        inputTitle.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                updateFieldErrorState(inputTitle, isTitleValid())
+            }
+        }
 
         // 🔽 Lista osób z ustawień (multi-choice)
         val buttonSelectPeople = Button(this)
@@ -221,8 +295,8 @@ class SavingsActivity : AppCompatActivity() {
             .setView(layout)
             .setPositiveButton("Zapisz") { _, _ ->
                 val title = inputTitle.text.toString()
-                val amount = inputAmount.text.toString().toDoubleOrNull()
-                if (title.isNotBlank() && amount != null) {
+                val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
+                if (title.isNotBlank() && amount != null && amount > 0) {
                     val db = AppDatabase.getDatabase(this)
                     lifecycleScope.launch {
                         val supabaseUid = Prefs.getSupabaseUid(this@SavingsActivity)
@@ -273,10 +347,10 @@ class SavingsActivity : AppCompatActivity() {
         layout.addView(inputTitle)
 
         val inputAmount = EditText(this)
-        inputAmount.setText(goal.targetAmount.toString())
-        inputAmount.inputType =
-            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        inputAmount.setText(MoneyFormatter.format(goal.targetAmount))
+        inputAmount.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         layout.addView(inputAmount)
+        setupMoneyInput(inputAmount)
 
         // 🔽 Przycisk do wyboru osób (zamiast spinnera)
         val buttonSelectPeople = Button(this)
@@ -326,7 +400,7 @@ class SavingsActivity : AppCompatActivity() {
                                 } else {
                                     Toast.makeText(
                                         this@SavingsActivity,
-                                        "Makszymalnie 3 osoby!",
+                                        "Maksymalnie 3 osoby!",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -380,8 +454,8 @@ class SavingsActivity : AppCompatActivity() {
             .setView(layout)
             .setPositiveButton("Zapisz") { _, _ ->
                 val newTitle = inputTitle.text.toString()
-                val newAmount = inputAmount.text.toString().toDoubleOrNull()
-                if (newTitle.isNotBlank() && newAmount != null) {
+                val newAmount = MoneyUtils.parseAmount(inputAmount.text.toString())
+                if (newTitle.isNotBlank() && newAmount != null && newAmount > 0) {
                     val db = AppDatabase.getDatabase(this)
                     lifecycleScope.launch {
                         val updateGoal = goal.copy(
@@ -450,11 +524,12 @@ class SavingsActivity : AppCompatActivity() {
         }
 
         // 🧾 Pole kwoty
-        val input = EditText(this).apply {
+        val inputAmount = EditText(this).apply {
             hint = "Kwota do dodania"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
-        layout.addView(input)
+        layout.addView(inputAmount)
+        setupMoneyInput(inputAmount)
 
         // 👥 Spinner – kto wpłaca
         val spinner = Spinner(this)
@@ -485,7 +560,7 @@ class SavingsActivity : AppCompatActivity() {
             .setTitle("Dodaj oszczędności")
             .setView(layout)
             .setPositiveButton("Dodaj") { _, _ ->
-                val amount = MoneyUtils.parseAmount(input.text.toString())
+                val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
                 val selectedPerson = spinner.selectedItem?.toString() ?: "Tylko ja"
 
                 if (amount != null && amount > 0) {
@@ -599,11 +674,13 @@ class SavingsActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 10)
         }
         // 🧾 Pole kwoty
-        val input = EditText(this).apply {
+        val inputAmount = EditText(this).apply {
             hint = "Kwota do wypłaty"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
-        layout.addView(input)
+        layout.addView(inputAmount)
+        setupMoneyInput(inputAmount)
+
         // 👥 Spinner – kto wpłaca
         val spinner = Spinner(this)
         layout.addView(spinner)
@@ -630,7 +707,7 @@ class SavingsActivity : AppCompatActivity() {
             .setTitle("Wypłać środki")
             .setView(layout)
             .setPositiveButton("Wypłać") { _, _ ->
-                val amount = MoneyUtils.parseAmount(input.text.toString())
+                val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
                 val selectedPerson = spinner.selectedItem.toString()
                 if (amount == null || amount <= 0) {
                     AlertDialog.Builder(this)
@@ -776,8 +853,8 @@ class SavingsActivity : AppCompatActivity() {
                         setTextColor(
                             MaterialColors.getColor(
                                 this@SavingsActivity,
-                                com.google.android.material.R.attr.colorOnSurface,
-                                    getColor(android.R.color.black)
+                                android.R.attr.textColorPrimary,
+                                getColor(android.R.color.black)
                             )
                         )
                     }
@@ -789,7 +866,7 @@ class SavingsActivity : AppCompatActivity() {
                         setTextColor(
                             MaterialColors.getColor(
                                 this@SavingsActivity,
-                                com.google.android.material.R.attr.colorOnSurface,
+                                android.R.attr.textColorPrimary,
                                 getColor(android.R.color.black)
                             )
                         )
@@ -812,7 +889,7 @@ class SavingsActivity : AppCompatActivity() {
                         setTextColor(
                             MaterialColors.getColor(
                                 this@SavingsActivity,
-                                com.google.android.material.R.attr.colorOnSurface,
+                                android.R.attr.textColorPrimary,
                                 getColor(android.R.color.black)
                             )
                         )
@@ -825,7 +902,7 @@ class SavingsActivity : AppCompatActivity() {
                         setTextColor(
                             MaterialColors.getColor(
                                 this@SavingsActivity,
-                                com.google.android.material.R.attr.colorOnSurface,
+                                android.R.attr.textColorPrimary,
                                 getColor(android.R.color.black)
                             )
                         )

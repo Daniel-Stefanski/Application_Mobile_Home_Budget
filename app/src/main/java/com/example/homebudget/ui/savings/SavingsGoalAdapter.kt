@@ -61,8 +61,8 @@ class SavingsGoalAdapter(
         }
 
         holder.textTitle.text = titletext
-        holder.textTarget.text = "Kwota docelowa: ${MoneyFormatter.formatWithCurrency(goal.targetAmount)} zł"
-        holder.textSaved.text = "Zaoszczędzono: ${MoneyFormatter.formatWithCurrency(goal.savedAmount)} zł"
+        holder.textTarget.text = "Kwota docelowa: ${MoneyFormatter.formatWithCurrency(goal.targetAmount)}"
+        holder.textSaved.text = "Zaoszczędzono: ${MoneyFormatter.formatWithCurrency(goal.savedAmount)}"
 
         holder.textSharedWith.text = if (goal.sharedWith.isNullOrBlank()) {
             "Z kim: Tylko ja"
@@ -95,7 +95,7 @@ class SavingsGoalAdapter(
                 "Termin: $formattedDate\nPo terminie o: ${-daysLeft} dni"
             }
         } else {
-            holder.textDaysLeft.text = "Bez termin"
+            holder.textDaysLeft.text = "Bez terminu"
         }
 
         // Obsługa kliknięć

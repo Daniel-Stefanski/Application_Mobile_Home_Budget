@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.TextView
@@ -13,8 +15,10 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.Spinner
 import android.widget.Toast
+import android.text.InputFilter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.core.widget.addTextChangedListener
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
@@ -24,6 +28,7 @@ import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.notifications.NotificationHelper
 import com.example.homebudget.utils.locale.LocaleUtils
+import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.money.MoneyUtils
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.work.worker.WorkSchedulerSupabase
@@ -42,7 +47,6 @@ class AddBillActivity : AppCompatActivity() {
     private lateinit var inputDescription: EditText
     private lateinit var inputAmount: EditText
     private lateinit var inputNote: EditText
-    private lateinit var textSelectedDate: TextView
     private lateinit var buttonSelectDate: Button
     private lateinit var buttonSaveBill: Button
     private lateinit var buttonCancel: Button
@@ -68,7 +72,6 @@ class AddBillActivity : AppCompatActivity() {
         inputAmount = findViewById(R.id.inputAmount)
         inputNote = findViewById(R.id.inputNote)
         spinnerInterval = findViewById(R.id.spinnerInterval)
-        textSelectedDate = findViewById(R.id.textSelectedDate)
         buttonSelectDate = findViewById(R.id.buttonSelectDate)
         buttonSaveBill = findViewById(R.id.buttonSaveBill)
         buttonCancel = findViewById(R.id.buttonCancel)
@@ -85,6 +88,18 @@ class AddBillActivity : AppCompatActivity() {
         updateSelectedDateLabel()
         setupAmountFormattingAndErrors()
         setupDescriptionErrors()
+        setupValidation()
+
+        inputAmount.filters = arrayOf(
+            InputFilter { source, start, end, dest, dstart, dend ->
+                val newText = StringBuilder(dest)
+                    .replace(dstart, dend, source.subSequence(start, end).toString())
+                    .toString()
+
+                val regex = Regex("^\\d+(?: ?\\d{0,3})*(?:,\\d{0,2})?$")
+                if (newText.isEmpty() || newText.matches(regex)) null else ""
+            }
+        )
 
         //opcje wyboru interwału
         val intervals = listOf("1 miesiąc", "2 miesiące", "3 miesiące", "6 miesięcy", "12 miesięcy")
@@ -271,8 +286,8 @@ class AddBillActivity : AppCompatActivity() {
     }
 
     private fun updateSelectedDateLabel() {
-        val sdf = SimpleDateFormat("dd.MM.yyyy", LocaleUtils.POLISH)
-        textSelectedDate.text = "Wybrana data: ${sdf.format(Date(selectedDate))}"
+        val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+        buttonSelectDate.text = sdf.format(Date(selectedDate))
     }
     // Edycja rachunku
     private fun loadBillForEdit(id: Int) {
@@ -288,6 +303,7 @@ class AddBillActivity : AppCompatActivity() {
             selectedDate = bill.date
             updateSelectedDateLabel()
             checkboxMarkPaid.isChecked = bill.status == "opłacony"
+            validateForm()
         }
     }
 
@@ -297,17 +313,32 @@ class AddBillActivity : AppCompatActivity() {
         val errorBorder = R.drawable.shape_search_border_error
 
         inputAmount.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                inputAmount.setBackgroundResource(normalBorder)
-            } else {
-                val value = MoneyUtils.parseAmount(inputAmount.text.toString())
-                if (value != null && value > 0) {
-                    inputAmount.setText(MoneyUtils.formatAmount(value))
-                    inputAmount.setSelection(inputAmount.text.length)
-                    inputAmount.setBackgroundResource(R.drawable.shape_search_border)
-                } else {
-                    inputAmount.setBackgroundResource(R.drawable.shape_search_border_error)
+            if (!hasFocus) {
+                val text = inputAmount.text.toString().trim()
+                if (text.isBlank()) {
+                    inputAmount.setBackgroundResource(errorBorder)
+                    inputAmount.error = "Podaj prawidłową kwotę"
+                    return@setOnFocusChangeListener
                 }
+
+                val normalizedText = when {
+                    text.endsWith(",") -> text + "00"
+                    text.contains(",") && text.substringAfter(",").length == 1 -> text + "0"
+                    else -> text
+                }
+
+                val value = MoneyUtils.parseAmount(normalizedText)
+                if (value != null && value > 0) {
+                    inputAmount.setText(MoneyFormatter.format(value))
+                    inputAmount.setSelection(inputAmount.text.length)
+                    inputAmount.setBackgroundResource(normalBorder)
+                    inputAmount.error = null
+                } else {
+                    inputAmount.setBackgroundResource(errorBorder)
+                    inputAmount.error = "Podaj prawidłową kwotę"
+                }
+            } else {
+                inputAmount.setBackgroundResource(normalBorder)
             }
         }
     }
@@ -318,12 +349,42 @@ class AddBillActivity : AppCompatActivity() {
         val errorBorder = R.drawable.shape_search_border_error
 
         inputDescription.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                inputDescription.setBackgroundResource(normalBorder)
-            } else {
+            if (!hasFocus) {
                 val valid = inputDescription.text.isNotBlank()
                 inputDescription.setBackgroundResource(if (valid) normalBorder else errorBorder)
+                inputDescription.error = if (valid) null else "Wpisz opis"
+            } else {
+                inputDescription.setBackgroundResource(normalBorder)
             }
         }
+    }
+
+    private fun setupValidation() {
+        val watcher = { validateForm() }
+
+        inputDescription.addTextChangedListener { watcher() }
+        inputAmount.addTextChangedListener { watcher() }
+
+        spinnerInterval.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) = watcher()
+
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) = watcher()
+        }
+    }
+
+    private fun validateForm() {
+        val descriptionValid = inputDescription.text.isNotBlank()
+        val amountValid = MoneyUtils.parseAmount(inputAmount.text.toString())?.let { it > 0 } == true
+        val intervalValid = spinnerInterval.selectedItem != null
+
+        buttonSaveBill.isEnabled = descriptionValid && amountValid && intervalValid
+
+        if (!amountValid) inputAmount.error = "Podaj prawidłową kwotę" else inputAmount.error = null
+        if (!descriptionValid) inputDescription.error = "Wpisz opis" else inputDescription.error = null
     }
 }

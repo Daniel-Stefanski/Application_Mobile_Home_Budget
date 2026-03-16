@@ -39,14 +39,12 @@ import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmSchedu
 import com.example.homebudget.ui.auth.LoginActivity
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.color.ColorPalette
-import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
 import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -500,34 +498,37 @@ class SettingsActivity : AppCompatActivity(){
         buttonDeleteAccount.setOnClickListener {
             val titleView = layoutInflater.inflate(R.layout.dialog_title, null)
             titleView.findViewById<TextView>(R.id.dialogTitle).text = "Usuń konto"
+
             AlertDialog.Builder(this)
                 .setCustomTitle(titleView)
                 .setMessage("Czy na pewno chcesz trwale usunąć konto i wszystkie dane?")
                 .setPositiveButton("Tak") { _, _ ->
                     val loadingView = layoutInflater.inflate(R.layout.dialog_loading, null)
                     loadingView.findViewById<TextView>(R.id.loadingText).text = "Usuwanie konta..."
+
                     val loadingDialog = AlertDialog.Builder(this)
                         .setView(loadingView)
                         .setCancelable(false)
                         .create()
+
                     loadingDialog.show()
+
                     lifecycleScope.launch {
                         val supabaseUid = Prefs.getSupabaseUid(this@SettingsActivity)
-                        try {
-                            // Usuń dane w Supabase (opcjonalnie, ale bardzo polecane)
-                            if (!supabaseUid.isNullOrBlank()) {
-                                ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
-                                SavingsRemoteRepository.deleteAllForUser(supabaseUid)
-                                MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
-                                SettingsRemoteRepository.deleteSettings(supabaseUid)
 
-                                // USUŃ KONTO AUTH (EDGE FUNCTION)
-                                SupabaseAccountRepository.deleteAccount(supabaseUid)
+                        try {
+                            if (supabaseUid.isNullOrBlank()) {
+                                throw IllegalStateException("Brak supabaseUid")
                             }
-                            // Usuń dane lokalne
+
+                            // Najpierw usuń konto z Supabase Auth
+                            SupabaseAccountRepository.deleteAccount(supabaseUid)
+
+                            // Dane lokalne usuwamy dopiero po sukcesie z Supabase Auth
+                            withContext(Dispatchers.IO) {
                             userDao.deleteUser(userId)
                             AppDatabase.getDatabase(this@SettingsActivity).clearAllTables()
-                            // Prefs
+                                }
                             Prefs.resetAll(this@SettingsActivity)
 
                             withContext(Dispatchers.Main) {
@@ -537,8 +538,8 @@ class SettingsActivity : AppCompatActivity(){
                                     "Konto zostało usunięte",
                                     Toast.LENGTH_SHORT
                                 ).show()
-                                val intent =
-                                    Intent(this@SettingsActivity, LoginActivity::class.java)
+
+                                val intent = Intent(this@SettingsActivity, LoginActivity::class.java)
                                 intent.flags =
                                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                                 startActivity(intent)
@@ -548,7 +549,8 @@ class SettingsActivity : AppCompatActivity(){
                             withContext(Dispatchers.Main) {
                                 loadingDialog.dismiss()
                                 Toast.makeText(
-                                    this@SettingsActivity, "Błąd usuwania konta. Spróbuj ponownie.",
+                                    this@SettingsActivity,
+                                    "Błąd usuwania konta: ${e.message}",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }

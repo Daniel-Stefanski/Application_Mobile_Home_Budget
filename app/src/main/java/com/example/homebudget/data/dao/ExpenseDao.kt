@@ -74,4 +74,10 @@ interface ExpenseDao {
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteExpenseById(id: Int)
+
+    @Query("SELECT * FROM expenses WHERE userId = :userId AND remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(userId: Int, remoteId: Long): Expense?
+
+    @Query("DELETE FROM expenses WHERE userId = :userId AND remoteId IS NOT NULL AND remoteId NOT IN (:remoteIds)")
+    suspend fun deleteNotInRemoteIds(userId: Int, remoteIds: List<Long>)
 }

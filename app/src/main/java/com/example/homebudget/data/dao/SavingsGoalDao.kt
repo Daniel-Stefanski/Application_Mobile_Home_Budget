@@ -39,4 +39,10 @@ interface SavingsGoalDao {
 
     @Query("UPDATE savings_goals SET remoteId = :remoteId WHERE id = :localId")
     suspend fun updateRemoteId(localId: Int, remoteId: Long)
+
+    @Query("SELECT * FROM savings_goals WHERE userId = :userId AND remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(userId: Int, remoteId: Long): SavingsGoal?
+
+    @Query("DELETE FROM savings_goals WHERE userId = :userId AND remoteId IS NOT NULL AND remoteId NOT IN (:remoteIds)")
+    suspend fun deleteNotInRemoteIds(userId: Int, remoteIds: List<Long>)
 }

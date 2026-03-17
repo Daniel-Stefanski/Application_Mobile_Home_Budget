@@ -115,9 +115,10 @@ class DashboardActivity : AppCompatActivity() {
         //Przywitanie użytkownika
         if (userId != -1) {
             lifecycleScope.launch {
-                DashboardSyncManager.sync(this@DashboardActivity)
                 val db = AppDatabase.Companion.getDatabase(this@DashboardActivity)
-                val user = db.userDao().getUserById(userId)
+                val user = withContext(Dispatchers.IO) {
+                    db.userDao().getUserById(userId)
+                }
                 withContext(Dispatchers.Main) {
                     if (user != null) {
                         textWelcome.text = "Witaj, ${user.name} w aplikacji HomeBudget \uD83D\uDC4B"
@@ -234,10 +235,14 @@ class DashboardActivity : AppCompatActivity() {
         if (firstLoadDone) return
         firstLoadDone = true
         lifecycleScope.launch {
-            // Najpierw sync z Supabase do Room
-            DashboardSyncManager.sync(this@DashboardActivity)
+            //1. Najpierw pokaż dane lokalnie (nawet stare)
+            loadAndShowData()
+            //2. Następnie sync z Supabase do Room (w tle)
+            withContext(Dispatchers.IO) {
+                DashboardSyncManager.sync(this@DashboardActivity)
+            }
             WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
-            // Dopiero potem odczyt z Room i rysowanie wykresu
+            //3. Odświeżenie UI po sync
             loadAndShowData()
         }
     }
@@ -726,7 +731,9 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadAndShowData()
+        if (!firstLoadDone) {
+            loadAndShowData()
+        }
         updateMonthLabel()
         updateMonthButtons()
     }

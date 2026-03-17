@@ -33,4 +33,7 @@ interface MonthlyBudgetDao {
     // Pobiera wszystkie budżety użytkownika (np. do znalezienia domyślnego)
     @Query("SELECT * FROM monthly_budgets WHERE userId = :userId")
     suspend fun getAllBudgetsForUser(userId: Int): List<MonthlyBudget>
+
+    @Query("SELECT * FROM monthly_budgets WHERE userId = :userId AND year = :year AND month = :month LIMIT 1")
+    suspend fun getByYearMonth(userId: Int, year: Int, month: Int): MonthlyBudget?
 }

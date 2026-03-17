@@ -31,4 +31,20 @@ interface ContributionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(list: List<Contribution>)
+
+    @Query("SELECT * FROM contributions WHERE userId = :userId AND remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(userId: Int, remoteId: Long): Contribution?
+
+    @androidx.room.Update
+    suspend fun update(contribution: Contribution)
+
+    @Query("""
+    DELETE FROM contributions 
+    WHERE goalId IN (
+        SELECT id FROM savings_goals WHERE userId = :userId
+    )
+    AND remoteId IS NOT NULL
+    AND remoteId NOT IN (:remoteIds)
+""")
+    suspend fun deleteNotInRemoteIds(userId: Int, remoteIds: List<Long>)
 }

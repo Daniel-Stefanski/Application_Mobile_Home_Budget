@@ -15,6 +15,7 @@ import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.ui.dashboard.DashboardActivity
@@ -151,7 +152,18 @@ class BillsPlannerActivity : AppCompatActivity() {
                         val updatedExpense = expense.copy(isRecurring = false)
                         db.expenseDao().updateExpense(updatedExpense)
                         val supabaseUid = Prefs.getSupabaseUid(this@BillsPlannerActivity)
-                        if (!supabaseUid.isNullOrBlank()) {
+                        if (supabaseUid.isNullOrBlank()) {
+                            PendingSyncHelper.enqueueOrMerge(
+                                db.pendingSyncDao(),
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_EXPENSE,
+                                    operation = SyncConstants.OP_UPDATE,
+                                    localId = updatedExpense.id,
+                                    remoteId = updatedExpense.remoteId,
+                                    payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
+                                )
+                            )
+                        } else {
                             try {
                                 if (updatedExpense.remoteId != null) {
                                     ExpenseRemoteRepository.updateExpense(
@@ -159,18 +171,20 @@ class BillsPlannerActivity : AppCompatActivity() {
                                         remoteId = updatedExpense.remoteId!!,
                                         expense = updatedExpense
                                     )
+                                } else {
+                                    val remoteId = ExpenseRemoteRepository.insertExpense(supabaseUid, updatedExpense)
+                                    db.expenseDao().updateRemoteId(updatedExpense.id, remoteId)
                                 }
                             } catch (e: Exception) {
-                                db.pendingSyncDao().insert(
+                                PendingSyncHelper.enqueueOrMerge(
+                                    db.pendingSyncDao(),
                                     PendingSync(
                                         entityType = SyncConstants.ENTITY_EXPENSE,
-                                        operation = SyncConstants.OP_UPDATE,
+                                        operation = if (updatedExpense.remoteId == null)
+                                            SyncConstants.OP_INSERT else SyncConstants.OP_UPDATE,
                                         localId = updatedExpense.id,
                                         remoteId = updatedExpense.remoteId,
-                                        payloadJson = Json.encodeToString(
-                                            Expense.serializer(),
-                                            updatedExpense
-                                        )
+                                        payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
                                     )
                                 )
                             }
@@ -213,7 +227,8 @@ class BillsPlannerActivity : AppCompatActivity() {
                         val op = if (updatedExpense.remoteId == null)
                             SyncConstants.OP_INSERT else SyncConstants.OP_UPDATE
 
-                        db.pendingSyncDao().insert(
+                        PendingSyncHelper.enqueueOrMerge(
+                            db.pendingSyncDao(),
                             PendingSync(
                                 entityType = SyncConstants.ENTITY_EXPENSE,
                                 operation = op,
@@ -227,7 +242,8 @@ class BillsPlannerActivity : AppCompatActivity() {
                     }
                 } else {
                     // Brak UID -> też dobrze jest zakolejkować, jeśli traktujesz chmurę jako źródło prawdy
-                    db.pendingSyncDao().insert(
+                    PendingSyncHelper.enqueueOrMerge(
+                        db.pendingSyncDao(),
                         PendingSync(
                             entityType = SyncConstants.ENTITY_EXPENSE,
                             operation = SyncConstants.OP_UPDATE,

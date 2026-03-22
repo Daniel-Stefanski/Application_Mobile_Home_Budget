@@ -40,12 +40,15 @@ import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.entity.Settings
 import com.example.homebudget.data.remote.repository.MonthlyBudgetRemoteRepository
 import com.example.homebudget.data.sync.DashboardSyncManager
+import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
+import com.example.homebudget.data.sync.SyncProcessor
 import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmScheduler
 import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.settings.Prefs
+import com.example.homebudget.utils.settings.SettingsHelper
 import com.github.mikephil.charting.charts.PieChart
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
@@ -237,12 +240,23 @@ class DashboardActivity : AppCompatActivity() {
         lifecycleScope.launch {
             //1. Najpierw pokaż dane lokalnie (nawet stare)
             loadAndShowData()
-            //2. Następnie sync z Supabase do Room (w tle)
-            withContext(Dispatchers.IO) {
+            //2. Najpierw wypchnij kolejkę do Supabase
+            val pushOk = withContext(Dispatchers.IO) {
+                SyncProcessor.processPendingSync(this@DashboardActivity)
+            }
+            //3. Jesli push się nie udał, zostaw worker jako próbę ponowną
+            if (!pushOk) {
+                WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
+                return@launch
+            }
+            //4. Dopiero teraz pobierz z Supabase aktualny stan (w tle)
+            val pullOk = withContext(Dispatchers.IO) {
                 DashboardSyncManager.sync(this@DashboardActivity)
             }
-            WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
-            //3. Odświeżenie UI po sync
+            if (!pullOk) {
+                WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
+            }
+            //5. Odświeżenie UI po sync
             loadAndShowData()
         }
     }
@@ -281,18 +295,8 @@ class DashboardActivity : AppCompatActivity() {
             if (settings == null) return@launch
 
             //Kategorie zapisane w ustawieniach
-            val activeCategories = try {
-                JSONObject(settings.categories)
-            } catch (e: Exception) {
-                JSONObject()
-            }
-
             val categoryList = mutableSetOf<String>()
-            val keys = activeCategories.keys()
-            while (keys.hasNext()) {
-                val name = keys.next()
-                if (name.isNotBlank()) categoryList.add(name)
-            }
+            categoryList.addAll(SettingsHelper.getCategories(settings))
 
             //Kategorie użyte w wydatkach
             val usedCategories = expenseDao.getAllExpensesForUser(userId)
@@ -395,7 +399,9 @@ class DashboardActivity : AppCompatActivity() {
             }
 
             // 🔹 Sprawdź czy kolory kategorii są puste i zainicjalizuj jeśli trzeba
-            val expenses = expenseDao.getAllExpensesForUser(userId)
+            val expenses = withContext(Dispatchers.IO) {
+                expenseDao.getAllExpensesForUser(userId)
+            }
             val usedCategories = expenses.mapNotNull { it.category }.filter { it.isNotBlank() }.distinct()
             val colorsJson = try {
                 JSONObject(settings.categoryColors)
@@ -424,7 +430,9 @@ class DashboardActivity : AppCompatActivity() {
                 )
             }
             // Po aktualizacji ustawień - pobierz je ponownie, aby wkres miał aktualne kolory
-            val newSettings = settingsDao.getSettingsForUser(userId)
+            val newSettings = withContext(Dispatchers.IO) {
+                settingsDao.getSettingsForUser(userId)
+            }
             val categoryColorsMap = try {
                 JSONObject(newSettings?.categoryColors ?: "{}")
             } catch (e: Exception) {
@@ -505,18 +513,67 @@ class DashboardActivity : AppCompatActivity() {
                     monthlyBudgetDao.getAllBudgetsForUser(userId).firstOrNull { it.isDefault }
                 }
                 if (defaultBudget != null) {
-                    val newBudget = defaultBudget.copy(
+                    var newBudget = defaultBudget.copy(
                         id = 0,
                         year = selectedYear,
                         month = selectedMonth,
                         isDefault = false
                     )
-                    withContext(Dispatchers.IO) {
-                        monthlyBudgetDao.insertBudget(newBudget)
+                    val insertedId = withContext(Dispatchers.IO) {
+                        monthlyBudgetDao.insertBudget(newBudget).toInt()
                     }
+                    newBudget = newBudget.copy(id = insertedId)
+
+                    val supabaseUid = Prefs.getSupabaseUid(this@DashboardActivity)
+                    if (supabaseUid.isNullOrBlank()) {
+                        withContext(Dispatchers.IO) {
+                            PendingSyncHelper.enqueueOrMerge(
+                                db.pendingSyncDao(),
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_BUDGET,
+                                    operation = SyncConstants.OP_UPDATE,
+                                    localId = newBudget.id,
+                                    remoteId = null,
+                                    payloadJson = Json.encodeToString(
+                                        MonthlyBudget.serializer(),
+                                        newBudget
+                                    )
+                                )
+                            )
+                        }
+                        WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
+                    } else {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                MonthlyBudgetRemoteRepository.upsertBudget(
+                                    supabaseUid = supabaseUid,
+                                    budget = newBudget
+                                )
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.IO) {
+                                PendingSyncHelper.enqueueOrMerge(
+                                    db.pendingSyncDao(),
+                                    PendingSync(
+                                        entityType = SyncConstants.ENTITY_BUDGET,
+                                        operation = SyncConstants.OP_UPDATE,
+                                        localId = newBudget.id,
+                                        remoteId = null,
+                                        payloadJson = Json.encodeToString(
+                                            MonthlyBudget.serializer(),
+                                            newBudget
+                                        )
+                                    )
+                                )
+                            }
+                            WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
+                        }
+                    }
+
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
-                            this@DashboardActivity, "Nowy miesiąc został utworzony automatycznie.",
+                            this@DashboardActivity,
+                            "Nowy miesiąc został utworzony automatycznie.",
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -677,7 +734,8 @@ class DashboardActivity : AppCompatActivity() {
                                 budget = newBudget,
                                 isDefault = repeat
                             )
-                            monthlyBudgetDao.insertBudget(budgetForMonth)
+                            val insertedId =monthlyBudgetDao.insertBudget(budgetForMonth).toInt()
+                            budgetForMonth = budgetForMonth.copy(id = insertedId)
                         } else {
                             budgetForMonth = budgetForMonth.copy(
                                 budget = newBudget,
@@ -687,14 +745,15 @@ class DashboardActivity : AppCompatActivity() {
                         }
                         // Supabase
                         val supabaseUid = Prefs.getSupabaseUid(this@DashboardActivity)
-                        if (supabaseUid != null) {
+                        if (!supabaseUid.isNullOrBlank()) {
                             try {
                                 MonthlyBudgetRemoteRepository.upsertBudget(
                                     supabaseUid = supabaseUid,
                                     budget = budgetForMonth
                                 )
                             } catch (e: Exception) {
-                                db.pendingSyncDao().insert(
+                                PendingSyncHelper.enqueueOrMerge(
+                                    db.pendingSyncDao(),
                                     PendingSync(
                                         entityType = SyncConstants.ENTITY_BUDGET,
                                         operation = SyncConstants.OP_UPDATE, // Upsert traktujemy jako update

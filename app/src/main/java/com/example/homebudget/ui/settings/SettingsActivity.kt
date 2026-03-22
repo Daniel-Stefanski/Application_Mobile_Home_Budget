@@ -34,6 +34,7 @@ import com.example.homebudget.data.remote.repository.MonthlyBudgetRemoteReposito
 import com.example.homebudget.data.remote.repository.SavingsRemoteRepository
 import com.example.homebudget.data.remote.repository.SettingsRemoteRepository
 import com.example.homebudget.data.remote.repository.SupabaseAccountRepository
+import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmScheduler
 import com.example.homebudget.ui.auth.LoginActivity
@@ -395,13 +396,12 @@ class SettingsActivity : AppCompatActivity(){
 
                     lifecycleScope.launch {
                         val db = AppDatabase.Companion.getDatabase(this@SettingsActivity)
+                        val budgetDao = db.monthlyBudgetDao()
                         val expenseDao = db.expenseDao()
                         val savingsDao = db.savingsGoalDao()
+                        val contributionDao = db.contributionDao()
                         val settingsDao = db.settingsDao()
-
-                        //Usuń dane powiązane z użytkownikiem
-                        expenseDao.deleteAll(userId)
-                        savingsDao.getGoalsForUser(userId).forEach { goal -> savingsDao.delete(goal) }
+                        val pendingSyncDao = db.pendingSyncDao()
 
                         //Przywróć domyślne ustawienia
                         val defaultCategories = listOf("Jedzenie","Transport","Rachunki","Rozrywka","Inne")
@@ -426,16 +426,37 @@ class SettingsActivity : AppCompatActivity(){
                             defaultCategory = "Brak",
                             defaultPaymentMethod = "Brak"
                         )
-                        saveSettingsAndSync(settingsDao, updatedSettings)
                         // Reset danych w supabase
                         val supabaseUid = Prefs.getSupabaseUid(this@SettingsActivity)
                         if (!supabaseUid.isNullOrBlank()) {
-                            ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
-                            SavingsRemoteRepository.deleteAllForUser(supabaseUid)
-                            MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
-                            SettingsRemoteRepository.resetSettings(supabaseUid, updatedSettings)
+                            try {
+                                ExpenseRemoteRepository.deleteAllForUser(supabaseUid)
+                                SavingsRemoteRepository.deleteAllForUser(supabaseUid)
+                                MonthlyBudgetRemoteRepository.deleteAllForUser(supabaseUid)
+                                SettingsRemoteRepository.resetSettings(supabaseUid, updatedSettings)
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    loadingDialog.dismiss()
+                                    Toast.makeText(this@SettingsActivity, "Nie udało się zresetować danych w chmurze: ${e.message}",
+                                        Toast.LENGTH_LONG).show()
+                                }
+                                return@launch
+                            }
                         }
+                        //Usuń dane powiązane z użytkownikiem
+                        withContext(Dispatchers.IO) {
+                            budgetDao.deleteAll(userId)
+                            expenseDao.deleteAll(userId)
+                            contributionDao.deleteAllForUser(userId)
+                            savingsDao.getGoalsForUser(userId)
+                                .forEach { goal -> savingsDao.delete(goal) }
 
+                            //Wyczyść kolejkę synchronizacji
+                            pendingSyncDao.getAll().forEach { item ->
+                                pendingSyncDao.delete(item)
+                            }
+                            settingsDao.insertSettings(updatedSettings)
+                        }
                         // Przywróć motyw do domyślnego (jasny)
                         Prefs.setAppTheme(this@SettingsActivity, "light")
 
@@ -451,10 +472,8 @@ class SettingsActivity : AppCompatActivity(){
                             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
                             //Odśwież ekran lub wróć do Dashboard
-                            val intent =
-                                Intent(this@SettingsActivity, DashboardActivity::class.java)
-                            intent.flags =
-                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            val intent = Intent(this@SettingsActivity, DashboardActivity::class.java)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             startActivity(intent)
                             finish()
                         }
@@ -596,7 +615,9 @@ class SettingsActivity : AppCompatActivity(){
                 }
 
                 lifecycleScope.launch {
-                    val settings = settingsDao.getSettingsForUser(userId)
+                    val settings = withContext(Dispatchers.IO) {
+                        settingsDao.getSettingsForUser(userId)
+                    }
                     if (settings != null) {
                         val categories = SettingsHelper.getCategories(settings)
                         val colors = SettingsHelper.getCategoryColors(settings)
@@ -642,12 +663,26 @@ class SettingsActivity : AppCompatActivity(){
     ) {
         settingsDao.insertSettings(settings)
         val supabaseUid = Prefs.getSupabaseUid(this)
-        if (!supabaseUid.isNullOrBlank()) {
+        if (supabaseUid.isNullOrBlank()) {
+            val db = AppDatabase.getDatabase(this)
+            PendingSyncHelper.enqueueOrMerge(
+                db.pendingSyncDao(),
+                PendingSync(
+                    entityType = SyncConstants.ENTITY_SETTINGS,
+                    operation = SyncConstants.OP_UPDATE,
+                    localId = settings.userId,
+                    remoteId = null,
+                    payloadJson = Json.encodeToString(Settings.serializer(), settings)
+                )
+            )
+            WorkSchedulerSupabase.scheduleSupabaseSync(this)
+        } else {
             try {
                 SettingsRemoteRepository.upsertSettings(supabaseUid, settings)
             } catch (e: Exception) {
                 val db = AppDatabase.getDatabase(this)
-                db.pendingSyncDao().insert(
+                PendingSyncHelper.enqueueOrMerge(
+                    db.pendingSyncDao(),
                     PendingSync(
                         entityType = SyncConstants.ENTITY_SETTINGS,
                         operation = SyncConstants.OP_UPDATE,
@@ -666,7 +701,9 @@ class SettingsActivity : AppCompatActivity(){
 
     private fun loadCategoriesList(settingsDao: SettingsDao, userId: Int, sectionCategories: LinearLayout) {
         lifecycleScope.launch {
-            val settings = settingsDao.getSettingsForUser(userId)
+            val settings = withContext(Dispatchers.IO) {
+                settingsDao.getSettingsForUser(userId)
+            }
             val context = this@SettingsActivity
 
             withContext(Dispatchers.Main) {
@@ -751,8 +788,9 @@ class SettingsActivity : AppCompatActivity(){
                                             if (!isCurrent) {
                                                 setOnClickListener {
                                                     lifecycleScope.launch {
-                                                        val currentSettings =
+                                                        val currentSettings = withContext(Dispatchers.IO) {
                                                             settingsDao.getSettingsForUser(userId)
+                                                        }
                                                         if (currentSettings != null) {
                                                             val categoryColors = JSONObject(currentSettings.categoryColors)
                                                             categoryColors.put(category, hex)
@@ -827,8 +865,9 @@ class SettingsActivity : AppCompatActivity(){
                                         )
                                         .setPositiveButton("Tak") { _, _ ->
                                             lifecycleScope.launch {
-                                                val currentSettings =
+                                                val currentSettings = withContext(Dispatchers.IO) {
                                                     settingsDao.getSettingsForUser(userId)
+                                                }
                                                 if (currentSettings != null) {
                                                     //Aktualna lista kategorii
                                                     val categoriesList = currentSettings.categories
@@ -927,7 +966,9 @@ class SettingsActivity : AppCompatActivity(){
                     return@setPositiveButton
                 }
                 lifecycleScope.launch {
-                    val settings = settingsDao.getSettingsForUser(userId)
+                    val settings = withContext(Dispatchers.IO) {
+                        settingsDao.getSettingsForUser(userId)
+                    }
                     if (settings != null) {
                         val existing = SettingsHelper.getPeople(settings)
                         if (existing.contains(newPerson)) {
@@ -962,7 +1003,9 @@ class SettingsActivity : AppCompatActivity(){
 
     private fun loadPeopleList(settingsDao: SettingsDao, userId: Int, sectionPeople: LinearLayout) {
         lifecycleScope.launch {
-            val settings = settingsDao.getSettingsForUser(userId)
+            val settings = withContext(Dispatchers.IO) {
+                settingsDao.getSettingsForUser(userId)
+            }
             val context = this@SettingsActivity
 
             withContext(Dispatchers.Main) {
@@ -1016,8 +1059,9 @@ class SettingsActivity : AppCompatActivity(){
                                         .setMessage("Czy na pewno chcesz usunąć osobę \"$name\" z listy?")
                                         .setPositiveButton("Tak") { _, _ ->
                                             lifecycleScope.launch {
-                                                val currentSettings =
+                                                val currentSettings = withContext(Dispatchers.IO) {
                                                     settingsDao.getSettingsForUser(userId)
+                                                }
                                                 if (currentSettings != null) {
                                                     val people =
                                                         SettingsHelper.getPeople(currentSettings)
@@ -1083,7 +1127,9 @@ class SettingsActivity : AppCompatActivity(){
         var isInitializingCategory = true
         var isInitializingPayment = true
         lifecycleScope.launch {
-            val settings = settingsDao.getSettingsForUser(userId)
+            val settings = withContext(Dispatchers.IO) {
+                settingsDao.getSettingsForUser(userId)
+            }
             // Kategoria z bazy + brak
             val categories = mutableListOf("Brak")
             if (settings != null) {

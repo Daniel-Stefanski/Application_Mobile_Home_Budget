@@ -12,8 +12,8 @@ import com.example.homebudget.data.entity.MonthlyBudget
 interface MonthlyBudgetDao {
 
     // Wstaw nowy budżet lub zastąp istniejący (dla danego miesiąca)
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
-    suspend fun insertBudget(monthlyBudget: MonthlyBudget)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBudget(monthlyBudget: MonthlyBudget): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<MonthlyBudget>)

@@ -24,6 +24,7 @@ import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.notifications.NotificationHelper
@@ -195,7 +196,21 @@ class AddBillActivity : AppCompatActivity() {
                     if (editBillId == null) {
                         val localId = db.expenseDao().insertExpense(expense).toInt()
                         val supabaseUid = Prefs.getSupabaseUid(this@AddBillActivity)
-                        if (!supabaseUid.isNullOrBlank()) {
+                        if (supabaseUid.isNullOrBlank()) {
+                            PendingSyncHelper.enqueueOrMerge(
+                                db.pendingSyncDao(),
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_EXPENSE,
+                                    operation = SyncConstants.OP_INSERT,
+                                    localId = localId,
+                                    remoteId = null,
+                                    payloadJson = Json.encodeToString(
+                                        Expense.serializer(),
+                                        expense.copy(id = localId)
+                                    )
+                                )
+                            )
+                        } else {
                             try {
                                 val remoteId = ExpenseRemoteRepository.insertExpense(
                                     supabaseUid,
@@ -203,16 +218,14 @@ class AddBillActivity : AppCompatActivity() {
                                 )
                                 db.expenseDao().updateRemoteId(localId, remoteId)
                             } catch (e: Exception) {
-                                db.pendingSyncDao().insert(
+                                PendingSyncHelper.enqueueOrMerge(
+                                    db.pendingSyncDao(),
                                     PendingSync(
                                         entityType = SyncConstants.ENTITY_EXPENSE,
                                         operation = SyncConstants.OP_INSERT,
                                         localId = localId,
                                         remoteId = null,
-                                        payloadJson = Json.encodeToString(
-                                            Expense.serializer(),
-                                            expense.copy(id = localId)
-                                        )
+                                        payloadJson = Json.encodeToString(Expense.serializer(), expense.copy(id = localId))
                                     )
                                 )
                             }
@@ -233,7 +246,19 @@ class AddBillActivity : AppCompatActivity() {
                         db.expenseDao().updateExpense(updatedExpense)
                         // Wyślij do Supabase
                         val supabaseUid = Prefs.getSupabaseUid(this@AddBillActivity)
-                        if (!supabaseUid.isNullOrBlank()) {
+                        if (supabaseUid.isNullOrBlank()) {
+                            PendingSyncHelper.enqueueOrMerge(
+                                db.pendingSyncDao(),
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_EXPENSE,
+                                    operation = if (updatedExpense.remoteId == null)
+                                        SyncConstants.OP_INSERT else SyncConstants.OP_UPDATE,
+                                    localId = updatedExpense.id,
+                                    remoteId = updatedExpense.remoteId,
+                                    payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
+                                )
+                            )
+                        } else {
                             try {
                                 if (updatedExpense.remoteId != null) {
                                     ExpenseRemoteRepository.updateExpense(
@@ -246,7 +271,8 @@ class AddBillActivity : AppCompatActivity() {
                                     db.expenseDao().updateRemoteId(updatedExpense.id, remoteId)
                                 }
                             } catch (e: Exception) {
-                                db.pendingSyncDao().insert(
+                                PendingSyncHelper.enqueueOrMerge(
+                                    db.pendingSyncDao(),
                                     PendingSync(
                                         entityType = SyncConstants.ENTITY_EXPENSE,
                                         operation = if (updatedExpense.remoteId == null)

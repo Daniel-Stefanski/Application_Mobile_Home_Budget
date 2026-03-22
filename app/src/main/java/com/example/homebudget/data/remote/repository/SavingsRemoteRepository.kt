@@ -56,7 +56,7 @@ object SavingsRemoteRepository {
             }
     }
 
-    suspend fun insertContribution(uid: String, goalRemoteId: Long, c: Contribution) {
+    suspend fun insertContribution(uid: String, goalRemoteId: Long, c: Contribution): Long {
         val dto = ContributionRemoteDto(
             user_id = uid,
             goal_id = goalRemoteId,
@@ -65,9 +65,14 @@ object SavingsRemoteRepository {
             timestamp = c.timestamp
         )
 
-        SupabaseClient.client
+        val inserted = SupabaseClient.client
             .from("contributions")
-            .upsert(dto, onConflict = "user_id")
+            .insert(dto) {
+                select()
+            }
+            .decodeSingle<ContributionRemoteReadDto>()
+
+        return inserted.id
     }
 
     suspend fun fetchGoals(uid: String): List<SavingsGoalRemoteReadDto> {

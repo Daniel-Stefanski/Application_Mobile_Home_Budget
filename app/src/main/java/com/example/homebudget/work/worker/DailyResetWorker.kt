@@ -5,9 +5,15 @@ import android.util.Log
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.data.entity.Expense
+import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.PendingSyncHelper
+import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.Calendar
 
 class DailyResetWorker(context: Context, workerParams: WorkerParameters)
@@ -63,16 +69,41 @@ class DailyResetWorker(context: Context, workerParams: WorkerParameters)
                     // Supabase
                     val supabaseUid = Prefs.getSupabaseUid(applicationContext)
                     if (!supabaseUid.isNullOrBlank() && updatedExpense.remoteId != null) {
-                        ExpenseRemoteRepository.updateExpense(
-                            supabaseUid = supabaseUid,
-                            remoteId = updatedExpense.remoteId!!,
-                            expense = updatedExpense
+                        try {
+                            ExpenseRemoteRepository.updateExpense(
+                                supabaseUid = supabaseUid,
+                                remoteId = updatedExpense.remoteId!!,
+                                expense = updatedExpense
+                            )
+                        } catch (e: Exception) {
+                            PendingSyncHelper.enqueueOrMerge(
+                                db.pendingSyncDao(),
+                                PendingSync(
+                                    entityType = SyncConstants.ENTITY_EXPENSE,
+                                    operation = SyncConstants.OP_UPDATE,
+                                    localId = updatedExpense.id,
+                                    remoteId = updatedExpense.remoteId,
+                                    payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
+                                )
+                            )
+                        }
+                    } else {
+                        PendingSyncHelper.enqueueOrMerge(
+                            db.pendingSyncDao(),
+                            PendingSync(
+                                entityType = SyncConstants.ENTITY_EXPENSE,
+                                operation = SyncConstants.OP_UPDATE,
+                                localId = updatedExpense.id,
+                                remoteId = updatedExpense.remoteId,
+                                payloadJson = Json.encodeToString(Expense.serializer(), updatedExpense)
+                            )
                         )
                     }
                     Log.d("DailyResetWorker", "CHECK id=${expense.id} remoteId=${expense.remoteId} monthsPassed=$monthsPassed repeat=${expense.repeatInterval} statusBefor=${expense.status}")
                 }
             }
         }
+        WorkSchedulerSupabase.scheduleSupabaseSync(applicationContext)
         return Result.success()
     }
 }

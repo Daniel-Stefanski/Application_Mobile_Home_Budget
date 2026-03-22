@@ -20,7 +20,7 @@ interface SettingsDao {
     @Query("SELECT * FROM settings WHERE userId = :userId LIMIT 1")
     suspend fun getSettingsForUser(userId: Int): Settings?
 
-    // ✅ Zaktualizowana wersja zapytania updateSettings – dodano defaultBudget
+    // Aktualizacja ustawień użytkownika
     @Query("UPDATE settings SET  " +
             "categories = :categories, " +
             "currency = :currency, " +

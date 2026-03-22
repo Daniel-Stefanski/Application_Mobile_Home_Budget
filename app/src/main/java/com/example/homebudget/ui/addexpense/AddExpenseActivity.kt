@@ -23,6 +23,7 @@ import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
+import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.locale.LocaleUtils
@@ -30,6 +31,7 @@ import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.money.MoneyUtils
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
+import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -347,35 +349,51 @@ class AddExpenseActivity : AppCompatActivity() {
         )
 
         lifecycleScope.launch {
-            val db = AppDatabase.Companion.getDatabase(this@AddExpenseActivity)
-            val supabaseUid = Prefs.getSupabaseUid(this@AddExpenseActivity)
-                ?: run {
-                   withContext(Dispatchers.Main) {
-                       Toast.makeText(this@AddExpenseActivity, "Brak połączenia z kontem Supabase", Toast.LENGTH_SHORT).show()
-                   }
-                    return@launch
-                }
+            val db = AppDatabase.getDatabase(this@AddExpenseActivity)
+
             withContext(Dispatchers.IO) {
                 // Zapis zawsze lokalnie
                 val localId = db.expenseDao().insertExpense(expense).toInt()
-                // Spróbuj wysłac do Supabase
-                try {
-                    val remoteId = ExpenseRemoteRepository.insertExpense(
-                        supabaseUid = supabaseUid,
-                        expense = expense.copy(id = localId) // żeby payload miał id
-                    )
-                    db.expenseDao().updateRemoteId(localId, remoteId)
-                } catch (e: Exception) {
-                    // Jeśli brak internetu -> kolejka
-                    db.pendingSyncDao().insert(
+                val localExpense = expense.copy(id = localId)
+
+                val supabaseUid = Prefs.getSupabaseUid(this@AddExpenseActivity)
+                if (supabaseUid.isNullOrBlank()) {
+                    PendingSyncHelper.enqueueOrMerge(
+                        db.pendingSyncDao(),
                         PendingSync(
                             entityType = SyncConstants.ENTITY_EXPENSE,
                             operation = SyncConstants.OP_INSERT,
                             localId = localId,
                             remoteId = null,
-                            payloadJson = Json.encodeToString(Expense.serializer(), expense.copy(id = localId))
+                            payloadJson = Json.encodeToString(Expense.serializer(), localExpense)
                         )
                     )
+                    WorkSchedulerSupabase.scheduleSupabaseSync(this@AddExpenseActivity)
+                } else {
+                    // Spróbuj wysłac do Supabase
+                    try {
+                        val remoteId = ExpenseRemoteRepository.insertExpense(
+                            supabaseUid = supabaseUid,
+                            expense = localExpense // żeby payload miał id
+                        )
+                        db.expenseDao().updateRemoteId(localId, remoteId)
+                    } catch (e: Exception) {
+                        // Jeśli brak internetu -> kolejka
+                        PendingSyncHelper.enqueueOrMerge(
+                            db.pendingSyncDao(),
+                            PendingSync(
+                                entityType = SyncConstants.ENTITY_EXPENSE,
+                                operation = SyncConstants.OP_INSERT,
+                                localId = localId,
+                                remoteId = null,
+                                payloadJson = Json.encodeToString(
+                                    Expense.serializer(),
+                                    localExpense
+                                )
+                            )
+                        )
+                        WorkSchedulerSupabase.scheduleSupabaseSync(this@AddExpenseActivity)
+                    }
                 }
             }
 

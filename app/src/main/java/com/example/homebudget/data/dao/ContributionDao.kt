@@ -21,12 +21,7 @@ interface ContributionDao {
     @Query("SELECT SUM(amount) FROM contributions WHERE goalId = :goalId AND personName = :personName")
     suspend fun getTotalForPerson(goalId: Int, personName: String): Double?
 
-    @Query("""
-    DELETE FROM contributions 
-    WHERE goalId IN (
-        SELECT id FROM savings_goals WHERE userId = :userId
-    )
-""")
+    @Query("DELETE FROM contributions WHERE userId = :userId")
     suspend fun deleteAllForUser(userId: Int)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -40,11 +35,12 @@ interface ContributionDao {
 
     @Query("""
     DELETE FROM contributions 
-    WHERE goalId IN (
-        SELECT id FROM savings_goals WHERE userId = :userId
-    )
+    WHERE userId = :userId
     AND remoteId IS NOT NULL
     AND remoteId NOT IN (:remoteIds)
-""")
+    """)
     suspend fun deleteNotInRemoteIds(userId: Int, remoteIds: List<Long>)
+
+    @Query("UPDATE contributions SET remoteId = :remoteId WHERE id = :localId")
+    suspend fun updateRemoteId(localId: Int, remoteId: Long)
 }

@@ -230,6 +230,14 @@ class AddBillActivity : AppCompatActivity() {
                                 )
                             }
                         }
+                        if (statusValue == "nieopłacony") {
+                            BillsAlarmScheduler.cancelAllReminders(this@AddBillActivity, localId)
+                            BillsAlarmScheduler.scheduleAllRemindersForDate(
+                                this@AddBillActivity,
+                                localId,
+                                selectedDate
+                            )
+                        }
                     } else {
                         // Edycja
                         // Pobierz aktualny obiekt

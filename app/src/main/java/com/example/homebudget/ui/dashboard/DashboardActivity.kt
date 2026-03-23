@@ -240,7 +240,6 @@ class DashboardActivity : AppCompatActivity() {
         lifecycleScope.launch {
             //1. Najpierw pokaż dane lokalnie (nawet stare)
             loadAndShowData()
-<<<<<<< HEAD
             //2. Najpierw wypchnij kolejkę do Supabase
             val pushOk = withContext(Dispatchers.IO) {
                 SyncProcessor.processPendingSync(this@DashboardActivity)
@@ -258,14 +257,6 @@ class DashboardActivity : AppCompatActivity() {
                 WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
             }
             //5. Odświeżenie UI po sync
-=======
-            //2. Następnie sync z Supabase do Room (w tle)
-            withContext(Dispatchers.IO) {
-                DashboardSyncManager.sync(this@DashboardActivity)
-            }
-            WorkSchedulerSupabase.scheduleSupabaseSync(this@DashboardActivity)
-            //3. Odświeżenie UI po sync
->>>>>>> abde858a44c9efea5cfceb369540cba69df30e1c
             loadAndShowData()
         }
     }

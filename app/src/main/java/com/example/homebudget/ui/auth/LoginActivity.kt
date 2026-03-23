@@ -1,9 +1,12 @@
 package com.example.homebudget.ui.auth
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
@@ -14,6 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.dao.UserDao
@@ -47,6 +51,7 @@ class LoginActivity : AppCompatActivity() {
         NotificationHelper.createNotificationChannel(this)
         WorkScheduler.scheduleDailyCheck(this)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        ensureNotificationPermission()
 
         restoreSupabaseUidFromSession()
 
@@ -189,5 +194,17 @@ class LoginActivity : AppCompatActivity() {
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
     }
 }

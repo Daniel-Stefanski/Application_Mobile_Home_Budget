@@ -20,6 +20,7 @@ object DashboardSyncManager {
 
         if (localUserId == -1 || supabaseUid.isNullOrBlank()) return@withContext false
 
+<<<<<<< HEAD
         try {
             val db = AppDatabase.getDatabase(context)
             val expenseDao = db.expenseDao()
@@ -126,6 +127,112 @@ object DashboardSyncManager {
             true
         } catch (_: Exception) {
             false
+=======
+        val db = AppDatabase.getDatabase(context)
+        val expenseDao = db.expenseDao()
+        val budgetDao = db.monthlyBudgetDao()
+        val savingsGoalDao = db.savingsGoalDao()
+        val contributionDao = db.contributionDao()
+        val settingsDao = db.settingsDao()
+
+        val remoteExpenses = ExpenseRemoteRepository.fetchAllExpenses(supabaseUid)
+        val remoteBudgets = MonthlyBudgetRemoteRepository.fetchAllBudgets(supabaseUid)
+        val remoteGoals = SavingsRemoteRepository.fetchGoals(supabaseUid)
+        val remoteContributions= SavingsRemoteRepository.fetchContributions(supabaseUid)
+        val remoteSettings = SettingsRemoteRepository.fetchSettings(supabaseUid)
+
+        db.withTransaction {
+            //1. Expenses
+            remoteExpenses.forEach { remote ->
+                val remoteId = remote.id ?: return@forEach
+                val localExpense = remote.toLocal(localUserId)
+                val existing = expenseDao.getByRemoteId(localUserId, remoteId)
+
+                if (existing == null) {
+                    expenseDao.insertExpense(localExpense)
+                } else {
+                    expenseDao.updateExpense(localExpense.copy(id = existing.id))
+                }
+            }
+
+            // Opcjonalnie usuń tylko te zdalne rekordy, które już nie istnieją w chmurze
+            if (remoteExpenses.isNotEmpty()) {
+                val remoteExpenseIds = remoteExpenses.mapNotNull { it.id }
+                if (remoteExpenseIds.isNotEmpty()) {
+                    expenseDao.deleteNotInRemoteIds(localUserId, remoteExpenseIds)
+                }
+            }
+
+            //2. Budgets
+            remoteBudgets.forEach { remote ->
+                val localBudget = remote.toLocal(localUserId)
+                val existing = budgetDao.getByYearMonth(localUserId, remote.year, remote.month)
+
+                if (existing == null) {
+                    budgetDao.insertBudget(localBudget)
+                } else {
+                    budgetDao.updateBudget(localBudget.copy(id = existing.id))
+                }
+            }
+
+            //3. Settings
+            if (remoteSettings != null) {
+                val localSettings = remoteSettings.toLocal(localUserId)
+                val existingSettings = settingsDao.getSettingsForUser(localUserId)
+
+                if (existingSettings == null) {
+                    settingsDao.insertSettings(localSettings)
+                } else {
+                    settingsDao.update(localSettings.copy(userId = existingSettings.userId))
+                }
+            }
+
+            //4. Savings Goals
+            remoteGoals.forEach { remote ->
+                val localGoal = remote.toLocal(localUserId)
+                val existing = savingsGoalDao.getByRemoteId(localUserId, remote.id)
+
+                if (existing == null) {
+                    savingsGoalDao.insert(localGoal)
+                } else {
+                    savingsGoalDao.update(localGoal.copy(id = existing.id))
+                }
+            }
+
+            if (remoteGoals.isNotEmpty()) {
+                val remoteGoalIds = remoteGoals.map { it.id }
+                savingsGoalDao.deleteNotInRemoteIds(localUserId, remoteGoalIds)
+            }
+
+            //5. Contributions
+            val savedGoals = savingsGoalDao.getGoalsForUser(localUserId)
+            val goalIdMap = savedGoals
+                .filter { it.remoteId != null }
+                .associate { it.remoteId!! to it.id }
+
+            val localContributions = remoteContributions.mapNotNull { remote ->
+                val localGoalId = goalIdMap[remote.goal_id]
+                localGoalId?.let {
+                    remote.toLocal(localUserId, it)
+                }
+            }
+
+            localContributions.forEach { contribution ->
+                val remoteId = contribution.remoteId ?: return@forEach
+                val existing = contributionDao.getByRemoteId(localUserId, remoteId)
+
+                if (existing == null) {
+                    contributionDao.insert(contribution)
+                } else {
+                    contributionDao.update(contribution.copy(id = existing.id))
+                }
+            }
+
+            if (remoteContributions.isNotEmpty()) {
+                val remoteContributionIds = remoteContributions.map { it.id }
+                contributionDao.deleteNotInRemoteIds(localUserId, remoteContributionIds)
+            }
+>>>>>>> abde858a44c9efea5cfceb369540cba69df30e1c
         }
     }
 }

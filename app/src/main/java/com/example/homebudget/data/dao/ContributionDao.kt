@@ -35,6 +35,7 @@ interface ContributionDao {
 
     @Query("""
     DELETE FROM contributions 
+<<<<<<< HEAD
     WHERE userId = :userId
     AND remoteId IS NOT NULL
     AND remoteId NOT IN (:remoteIds)
@@ -43,4 +44,13 @@ interface ContributionDao {
 
     @Query("UPDATE contributions SET remoteId = :remoteId WHERE id = :localId")
     suspend fun updateRemoteId(localId: Int, remoteId: Long)
+=======
+    WHERE goalId IN (
+        SELECT id FROM savings_goals WHERE userId = :userId
+    )
+    AND remoteId IS NOT NULL
+    AND remoteId NOT IN (:remoteIds)
+""")
+    suspend fun deleteNotInRemoteIds(userId: Int, remoteIds: List<Long>)
+>>>>>>> abde858a44c9efea5cfceb369540cba69df30e1c
 }

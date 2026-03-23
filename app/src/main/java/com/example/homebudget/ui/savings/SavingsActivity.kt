@@ -353,6 +353,13 @@ class SavingsActivity : AppCompatActivity() {
                                 WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
                             }
                         }
+                        if (Prefs.isNotificationsEnabled(this@SavingsActivity)) {
+                            SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, localId)
+                            SavingsGoalAlarmScheduler.scheduleAllRemindersForGoal(
+                                this@SavingsActivity,
+                                goal.copy(id = localId)
+                            )
+                        }
                         selectedEndDate = null
                     }
                 } else {

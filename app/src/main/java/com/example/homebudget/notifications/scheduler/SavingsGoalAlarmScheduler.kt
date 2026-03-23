@@ -10,39 +10,38 @@ import com.example.homebudget.notifications.receiver.SavingsGoalNotificationRece
 import com.example.homebudget.utils.settings.Prefs
 import java.util.Calendar
 
-// SavingsGoalAlarmScheduler.kt – planuje alarmy dla celów oszczędnościowych.
 object SavingsGoalAlarmScheduler {
-    // Slot: 1 = -30dni, 2 = -14, 3 = -7, 4 = -2, 5 = -1, 6 = w dniu terminu
-    private fun pendingIntentFor(context: Context, goalId: Int, slot: Int): PendingIntent{
+    private fun pendingIntentFor(context: Context, goalId: Int, slot: Int): PendingIntent {
         val intent = Intent(context, SavingsGoalNotificationReceiver::class.java).apply {
             putExtra("goalId", goalId)
             putExtra("slot", slot)
         }
         val requestCode = goalId * 10 + slot
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        else
+        } else {
             PendingIntent.FLAG_UPDATE_CURRENT
+        }
         return PendingIntent.getBroadcast(context, requestCode, intent, flags)
     }
 
     private fun scheduleReminder(context: Context, goalId: Int, triggerAtMillis: Long, slot: Int) {
-        // Nie planujemy w przeszłości
         if (triggerAtMillis <= System.currentTimeMillis()) return
+
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pi = pendingIntentFor(context, goalId, slot)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val am = context.getSystemService(AlarmManager::class.java)
-                if (!am.canScheduleExactAlarms()) {
-                    // Użytkownik nie zezwolił na dokładne alarmy
-                    return
-                }
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val canUseExactAlarm = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                alarmManager.canScheduleExactAlarms()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && canUseExactAlarm) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
-            } else {
+            } else if (canUseExactAlarm) {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
             }
         } catch (e: SecurityException) {
             e.printStackTrace()
@@ -62,13 +61,12 @@ object SavingsGoalAlarmScheduler {
         }
     }
 
-    // Główna funkcja - ustaw wszystkie przypomnienia dla danego celu
     fun scheduleAllRemindersForGoal(context: Context, goal: SavingsGoal) {
         if (!Prefs.isNotificationsEnabled(context)) return
 
         val endDate = goal.endDate ?: return
-        // Jeśli cel osiągnięty - nie przypominaj
         if (goal.savedAmount >= goal.targetAmount) return
+
         val hour = 8
         val minute = 0
         val dayMs = 24L * 60 * 60 * 1000

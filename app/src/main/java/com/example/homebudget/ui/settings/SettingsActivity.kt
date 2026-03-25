@@ -27,8 +27,10 @@ import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.dao.SettingsDao
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.entity.Settings
+import com.example.homebudget.data.entity.SavingsGoal
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import com.example.homebudget.data.remote.repository.MonthlyBudgetRemoteRepository
 import com.example.homebudget.data.remote.repository.SavingsRemoteRepository
@@ -36,7 +38,9 @@ import com.example.homebudget.data.remote.repository.SettingsRemoteRepository
 import com.example.homebudget.data.remote.repository.SupabaseAccountRepository
 import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
+import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmScheduler
+import com.example.homebudget.notifications.scheduler.SavingsGoalAlarmScheduler
 import com.example.homebudget.ui.auth.LoginActivity
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.color.ColorPalette
@@ -49,6 +53,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -185,17 +190,12 @@ class SettingsActivity : AppCompatActivity(){
         //Zapisz
         checkboxNotifications.setOnCheckedChangeListener { _, isChecked ->
             Prefs.setNotificationsEnabled(this, isChecked)
-            if (isChecked) {
-                // 🔕 Przy wyłączeniu anulujemy alarm
-                DashboardBudgetAlarmScheduler.scheduleDailyBudgetCheck(this)
-            } else {
-                // 🔕 Przy wyłączeniu anulujemy alarm
-                DashboardBudgetAlarmScheduler.cancelScheduledBudgetCheck(this)
-            }
+            updateNotificationSchedules(isChecked)
+
             val message = if (isChecked) {
-                "\uD83D\uDD14 Powiadomienia zostały włączone."
+                "\uD83D\uDD14 Powiadomienia zosta\u0142y w\u0142\u0105czone."
             } else {
-                "\uD83D\uDD15 Powiadomienia zostały wyłączone. Przypomnienia o rachunkach nie będą aktywne."
+                "\uD83D\uDD15 Powiadomienia zosta\u0142y wy\u0142\u0105czone. Alarmy bud\u017cetu, rachunk\u00f3w i cel\u00f3w zosta\u0142y zatrzymane."
             }
 
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
@@ -1199,6 +1199,67 @@ class SettingsActivity : AppCompatActivity(){
                     override fun onNothingSelected(parent: AdapterView<*>) {}
                 }
         }
+    }
+
+    private fun updateNotificationSchedules(enabled: Boolean) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                val db = AppDatabase.getDatabase(this@SettingsActivity)
+                val recurringBills = db.expenseDao().getRecurringExpenses(userId)
+                val savingsGoals = db.savingsGoalDao().getGoalsForUser(userId)
+
+                if (enabled) {
+                    DashboardBudgetAlarmScheduler.scheduleDailyBudgetCheck(this@SettingsActivity)
+                    rescheduleBillsNotifications(recurringBills)
+                    rescheduleSavingsNotifications(savingsGoals)
+                } else {
+                    DashboardBudgetAlarmScheduler.cancelScheduledBudgetCheck(this@SettingsActivity)
+                    recurringBills.forEach { bill ->
+                        BillsAlarmScheduler.cancelAllReminders(this@SettingsActivity, bill.id)
+                    }
+                    savingsGoals.forEach { goal ->
+                        SavingsGoalAlarmScheduler.cancelAllReminders(this@SettingsActivity, goal.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun rescheduleBillsNotifications(recurringBills: List<Expense>) {
+        val now = System.currentTimeMillis()
+
+        recurringBills.forEach { bill ->
+            BillsAlarmScheduler.cancelAllReminders(this@SettingsActivity, bill.id)
+            if (bill.status == "op\u0142acony") return@forEach
+
+            val nextCycleDate = nextBillCycleDate(bill, now)
+            BillsAlarmScheduler.scheduleAllRemindersForDate(
+                this@SettingsActivity,
+                bill.id,
+                nextCycleDate
+            )
+        }
+    }
+
+    private fun rescheduleSavingsNotifications(goals: List<SavingsGoal>) {
+        goals.forEach { goal ->
+            SavingsGoalAlarmScheduler.cancelAllReminders(this@SettingsActivity, goal.id)
+            if (goal.endDate != null && goal.savedAmount < goal.targetAmount) {
+                SavingsGoalAlarmScheduler.scheduleAllRemindersForGoal(this@SettingsActivity, goal)
+            }
+        }
+    }
+
+    private fun nextBillCycleDate(expense: Expense, now: Long): Long {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = expense.date
+        }
+
+        while (cal.timeInMillis < now) {
+            cal.add(Calendar.MONTH, expense.repeatInterval)
+        }
+
+        return cal.timeInMillis
     }
 
     private fun toggleSection(section: LinearLayout, arrow: TextView) {

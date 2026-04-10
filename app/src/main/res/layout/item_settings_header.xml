@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -12,15 +12,14 @@
     app:strokeWidth="1dp"
     app:strokeColor="#CCCCCC"
     app:cardBackgroundColor="@color/white">
-    <!-- item_settings_header.xml – wygląd nagłówków rozwijanych sekcji -->
+
     <LinearLayout
-        android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:padding="12dp"
         android:gravity="center_vertical">
 
-        <!-- Tytuł sekcji -->
         <TextView
             android:id="@+id/textHeaderTitle"
             android:layout_width="0dp"
@@ -29,16 +28,15 @@
             android:text="Sekcja"
             android:textSize="18sp"
             android:fontFamily="sans-serif-medium"
-            android:textColor="@android:color/black"/>
+            android:textColor="@android:color/black" />
 
-        <!-- Strzałka ▼ / ▲ -->
         <TextView
             android:id="@+id/textHeaderArrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="▼"
+            android:text="&#9660;"
             android:textSize="20sp"
-            android:paddingStart="8dp"/>
+            android:paddingStart="8dp" />
 
     </LinearLayout>
 

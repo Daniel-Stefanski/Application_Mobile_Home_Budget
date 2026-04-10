@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.auth
+﻿package com.example.homebudget.ui.auth
 
 import android.content.Intent
 import android.graphics.Color
@@ -21,20 +21,20 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
-import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.MonthlyBudget
 import com.example.homebudget.data.entity.Settings
 import com.example.homebudget.data.entity.User
 import com.example.homebudget.data.remote.AuthRepository
+import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
-//RegisterActivity.kt – ekran rejestracji nowego użytkownika.
+// RegisterActivity.kt - ekran rejestracji nowego uzytkownika.
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var nameField: EditText
@@ -50,13 +50,10 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var textTermsError: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
 
-        // Ekran rejestracji zawsze będzie miał motyw jasny
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-
-        // Inicjalizacja widoków (użyte Twoje ID z layoutu)
         nameField = findViewById(R.id.editTextName)
         emailField = findViewById(R.id.editTextEmail)
         passwordField = findViewById(R.id.editTextPassword)
@@ -68,12 +65,12 @@ class RegisterActivity : AppCompatActivity() {
         loginText = findViewById(R.id.textLogin)
         findViewById<View>(R.id.imagePasswordInfo).setOnClickListener {
             AlertDialog.Builder(this)
-                .setTitle("Wymagania hasła")
+                .setTitle("Wymagania hasla")
                 .setMessage(
                     """
-                    • minimum 8 znaków
-                    • co najmniej 1 mała litera
-                    • co najmniej 1 duża litera
+                    • minimum 8 znakow
+                    • co najmniej 1 mala litera
+                    • co najmniej 1 duza litera
                     • co najmniej 1 cyfra
                     • co najmniej 1 znak specjalny
                     """.trimIndent()
@@ -82,41 +79,34 @@ class RegisterActivity : AppCompatActivity() {
                 .show()
         }
 
-        //Tworzy klikalny fragment "Regulamin"
-        val termsText = "Akceptuję Regulamin"
+        val termsText = "Akceptuje Regulamin"
         val spannable = SpannableString(termsText)
 
-        //Ustawiamy klikalny fragment (tylko słowo "Regulamin")
         val clickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
-                //Otwieramy osobny ekran z regulaminem
                 val intent = Intent(this@RegisterActivity, TermsActivity::class.java)
                 startActivityForResult(intent, 1001)
             }
 
             override fun updateDrawState(ds: TextPaint) {
                 super.updateDrawState(ds)
-                ds.color = Color.parseColor("#1976D2") //niebieski jak w linku
+                ds.color = Color.parseColor("#1976D2")
                 ds.isUnderlineText = true
             }
         }
 
-        //Zakres dla słowa "Regulamin"
         spannable.setSpan(clickableSpan, 10, termsText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        //Ustawiamy tekst z linkiem
         checkboxTerms.text = spannable
         checkboxTerms.movementMethod = LinkMovementMethod.getInstance()
         checkboxTerms.highlightColor = Color.TRANSPARENT
 
-        // Wyświetlanie błędu gdy nie zaakceptujemy Regulaminu
         textTermsError = findViewById(R.id.textTermsError)
 
-        val db = AppDatabase.Companion.getDatabase(this)
+        val db = AppDatabase.getDatabase(this)
         val userDao = db.userDao()
         val settingsDao = db.settingsDao()
 
-        // Pokaz/ukryj hasła
         checkboxShowPassword.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 passwordField.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
@@ -129,7 +119,6 @@ class RegisterActivity : AppCompatActivity() {
             confirmPasswordField.setSelection(confirmPasswordField.text.length)
         }
 
-        // Rejestracja
         registerButton.setOnClickListener {
             val name = nameField.text.toString().trim()
             val email = emailField.text.toString().trim().lowercase()
@@ -139,13 +128,11 @@ class RegisterActivity : AppCompatActivity() {
 
             var isValid = true
 
-            // Reset błędów
             nameField.error = null
             emailField.error = null
             passwordField.error = null
             confirmPasswordField.error = null
 
-            // Walidacja
             if (email.isEmpty()) {
                 showFieldError(emailField, "Email jest wymagany")
                 isValid = false
@@ -154,30 +141,29 @@ class RegisterActivity : AppCompatActivity() {
                 isValid = false
             }
             if (password.isEmpty()) {
-                showFieldError(passwordField, "Wpisz hasło")
+                showFieldError(passwordField, "Wpisz haslo")
                 isValid = false
             }
             if (password != confirmPassword) {
-                showFieldError(confirmPasswordField, "Hasła się nie zgadzają")
+                showFieldError(confirmPasswordField, "Hasla sie nie zgadzaja")
                 isValid = false
             }
             if (!acceptedTerms) {
                 textTermsError.visibility = View.VISIBLE
                 checkboxTerms.setTextColor(Color.RED)
                 isValid = false
-                return@setOnClickListener //Zatrzyma działanie przycisku
+                return@setOnClickListener
             } else {
                 textTermsError.visibility = View.GONE
                 checkboxTerms.setTextColor(Color.BLACK)
             }
 
             if (!isPasswordValid(password)) {
-                showFieldError(passwordField, "Hasło nie spełnia wymagań!")
+                showFieldError(passwordField, "Haslo nie spelnia wymagan!")
                 isValid = false
             }
             if (!isValid) return@setOnClickListener
 
-            // Loader
             progressBar.visibility = View.VISIBLE
             registerButton.isEnabled = false
 
@@ -189,10 +175,9 @@ class RegisterActivity : AppCompatActivity() {
                     runOnUiThread {
                         progressBar.visibility = View.GONE
                         registerButton.isEnabled = true
-                        emailField.error = "Email już istnieje"
+                        emailField.error = "Email juz istnieje"
                     }
                 } else {
-                    // 1) Rejestracja w Supabase Auth (email+haslo)
                     val supaResult = AuthRepository.signUp(email, password)
 
                     if (supaResult.isFailure) {
@@ -201,7 +186,7 @@ class RegisterActivity : AppCompatActivity() {
                             registerButton.isEnabled = true
                             Toast.makeText(
                                 this@RegisterActivity,
-                                "❌ Supabase: ${supaResult.exceptionOrNull()?.message}",
+                                "Supabase: ${supaResult.exceptionOrNull()?.message}",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
@@ -209,14 +194,12 @@ class RegisterActivity : AppCompatActivity() {
                     }
 
                     val supabaseUser = supaResult.getOrThrow()
-                    val supabaseUid = supabaseUser.id // UUID jako String
+                    val supabaseUid = supabaseUser.id
 
-                    // 2) Zapisz supabase UID w Prefs
                     withContext(Dispatchers.Main) {
                         Prefs.setSupabaseUid(this@RegisterActivity, supabaseUid)
                     }
 
-                    // 3) Dopiero teraz tworzysz lokalnego usera (offline)
                     val currentTime = System.currentTimeMillis()
                     val safeName = name.trim().take(20)
                     val newUser = User(
@@ -232,25 +215,22 @@ class RegisterActivity : AppCompatActivity() {
                         userDao.insertUser(newUser).toInt()
                     }
 
-                    // 4) Zapisz lokalny USER_ID do Prefs jak dotychczas
                     withContext(Dispatchers.Main) {
                         Prefs.setUserId(this@RegisterActivity, userId)
+                        Prefs.setAppThemeForUser(this@RegisterActivity, userId, "light")
                     }
 
-
-                    // Tworzymy domyślne ustawienia dla nowego użytkownika
                     val defaultSettings = Settings(
                         userId = userId,
                         categories = "[\"Jedzenie\",\"Transport\",\"Rachunki\",\"Rozrywka\",\"Inne\"]",
                         currency = "PLN",
-                        period = "Miesięczny",
+                        period = "Miesieczny",
                         savingsGoal = 0.0
                     )
                     withContext(Dispatchers.IO) {
                         settingsDao.insertSettings(defaultSettings)
                     }
 
-                    //Tworzymy też początkowy rekord w MonthlyBudget z budżetem = 0.0
                     val monthlyBudgetDao = db.monthlyBudgetDao()
                     val currentDate = Calendar.getInstance()
                     val currentYear = currentDate.get(Calendar.YEAR)
@@ -267,17 +247,11 @@ class RegisterActivity : AppCompatActivity() {
                         monthlyBudgetDao.insertBudget(newBudget)
                     }
 
-                    //Zapisz domyślny motyw dla nowego użytkownika (jasny)
-                    Prefs.setAppTheme(this@RegisterActivity, "light")
-
-                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-
                     runOnUiThread {
                         progressBar.visibility = View.GONE
                         registerButton.isEnabled = true
-                        Toast.makeText(this@RegisterActivity, "✅ Konto utworzone", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@RegisterActivity, "Konto utworzone", Toast.LENGTH_SHORT).show()
 
-                        // Przenosimy do Dashboard (USER_ID już zapisany w prefs)
                         val intent = Intent(this@RegisterActivity, DashboardActivity::class.java)
                         startActivity(intent)
                         finish()
@@ -286,15 +260,14 @@ class RegisterActivity : AppCompatActivity() {
             }
         }
 
-        // Powrót do logowania
         loginText.setOnClickListener {
             val intent = Intent(this, LoginActivity::class.java)
             startActivity(intent)
-            finish() // wraca do LoginActivity
+            finish()
         }
     }
 
-    private fun showFieldError(editText: EditText, message:String) {
+    private fun showFieldError(editText: EditText, message: String) {
         editText.setBackgroundResource(R.drawable.shape_search_border_error)
         editText.error = message
 
@@ -315,7 +288,7 @@ class RegisterActivity : AppCompatActivity() {
         if (requestCode == 1001) {
             if (resultCode == RESULT_OK) {
                 checkboxTerms.isChecked = true
-                Toast.makeText(this, "Regulamin został zaakceptowany ✅", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Regulamin zostal zaakceptowany", Toast.LENGTH_SHORT).show()
             }
         }
     }

@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.settings
+﻿package com.example.homebudget.ui.settings
 
 import android.content.Intent
 import android.content.res.Configuration
@@ -52,15 +52,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
-//SettingsActivity.kt – ekran ustawień aplikacji.
+// SettingsActivity.kt - ekran ustawien aplikacji.
 class SettingsActivity : AppCompatActivity(){
 
     private var userId: Int = -1
+
+    companion object {
+        private const val ARROW_EXPANDED = "\u25B2"
+        private const val ARROW_COLLAPSED = "\u25BC"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,7 +75,7 @@ class SettingsActivity : AppCompatActivity(){
             return
         }
 
-        //Sekcja główne
+        //Sekcja gĹ‚Ăłwne
         val sectionAccount = findViewById<LinearLayout>(R.id.sectionAccount)
         val userDao = AppDatabase.Companion.getDatabase(this).userDao()
         val editName = findViewById<EditText>(R.id.editTextName)
@@ -82,8 +84,6 @@ class SettingsActivity : AppCompatActivity(){
         val editNewPassword = findViewById<EditText>(R.id.editTextNewPassword)
         val checkboxShowPasswordSettings = findViewById<CheckBox>(R.id.checkboxShowPasswordSettings)
         val checkboxNotifications = findViewById<CheckBox>(R.id.checkboxNotifications)
-        val textCreatedAt = findViewById<TextView>(R.id.textCreatedAt)
-        val textLastLogin = findViewById<TextView>(R.id.textLastLogin)
         val buttonDeleteAccount = findViewById<TextView>(R.id.buttonDeleteAccount)
         val buttonSaveChanges = findViewById<Button>(R.id.buttonSaveAccountChanges)
 
@@ -102,7 +102,7 @@ class SettingsActivity : AppCompatActivity(){
 
         val sectionPeople = findViewById<LinearLayout>(R.id.sectionPeople)
 
-        //Nagłówki sekcji (kliknięcie do rozwijania)
+        //NagĹ‚Ăłwki sekcji (klikniÄ™cie do rozwijania)
         val headerAccount = findViewById<View>(R.id.headerAccount)
         val headerAcountTitle = headerAccount.findViewById<TextView>(R.id.textHeaderTitle)
         val headerAccountArrow = headerAccount.findViewById<TextView>(R.id.textHeaderArrow)
@@ -133,23 +133,17 @@ class SettingsActivity : AppCompatActivity(){
         val labelDark = rowDark.getChildAt(2) as TextView
         val labelSystem = rowSystem.getChildAt(2) as TextView
 
-        textCreatedAt.setTextColor(secondaryColor)
-        textLastLogin.setTextColor(secondaryColor)
         labelLight.setTextColor(secondaryColor)
         labelDark.setTextColor(secondaryColor)
         labelSystem.setTextColor(secondaryColor)
 
-        // Załadowanie danych użytkownika
+        // ZaĹ‚adowanie danych uĹĽytkownika
         lifecycleScope.launch {
             val currentUser = userDao.getUserById(userId)
             currentUser?.let {
                 runOnUiThread {
                     editName.setText(it.name)
                     editEmail.setText(it.username)
-
-                    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                    textCreatedAt.text = "Data utworzenia konta: ${dateFormat.format(Date(it.createdAt))}"
-                    textLastLogin.text = "Ostatnie logowanie: ${dateFormat.format(Date(it.lastLogin))}"
                 }
             }
         }
@@ -168,7 +162,7 @@ class SettingsActivity : AppCompatActivity(){
                 .setPositiveButton("OK", null)
                 .show()
         }
-        //Pokaż/Ukryj hasło
+        //PokaĹĽ/Ukryj hasĹ‚o
         checkboxShowPasswordSettings.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 editOldPassword.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
@@ -184,7 +178,7 @@ class SettingsActivity : AppCompatActivity(){
             editNewPassword.setSelection(editNewPassword.text.length)
         }
 
-        //Włącz/wyłącz powiadomienia
+        //WĹ‚Ä…cz/wyĹ‚Ä…cz powiadomienia
         //Wczytanie
         checkboxNotifications.isChecked = Prefs.isNotificationsEnabled(this)
         //Zapisz
@@ -233,7 +227,7 @@ class SettingsActivity : AppCompatActivity(){
                         }
                     }
 
-                    //Zmiana hasła
+                    //Zmiana hasĹ‚a
                     if (oldPass.isNotEmpty() || newPass.isNotEmpty()) {
                         if (oldPass.isEmpty() || newPass.isEmpty()) {
                             withContext(Dispatchers.Main) {
@@ -258,7 +252,7 @@ class SettingsActivity : AppCompatActivity(){
                             withContext(Dispatchers.Main) {
                                 Toast.makeText(
                                     this@SettingsActivity,
-                                    "Stare hasło nie poprawne",
+                                    "Stare hasło niepoprawne",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -290,7 +284,7 @@ class SettingsActivity : AppCompatActivity(){
             else -> radioSystem.isChecked = true
         }
 
-        //Obsługa zmiany motywu
+        //ObsĹ‚uga zmiany motywu
         fun selectTheme(mode: String) {
             val newMode = when (mode) {
                 "light" -> AppCompatDelegate.MODE_NIGHT_NO
@@ -324,7 +318,7 @@ class SettingsActivity : AppCompatActivity(){
         //Przycisk wyloguj
         val buttonLogout = findViewById<Button>(R.id.buttonLogout)
 
-        //Początkowo ukrywamy sekcję
+        //PoczÄ…tkowo ukrywamy sekcjÄ™
         sectionAccount.visibility = View.GONE
         sectionPreferences.visibility = View.GONE
         sectionTheme.visibility = View.GONE
@@ -338,7 +332,7 @@ class SettingsActivity : AppCompatActivity(){
             sectionCategories to headerCategoriesArrow,
             sectionPeople to headerPeopleArrow
         )
-        //Klikniecie rozwijające
+        //Klikniecie rozwijajÄ…ce
         headerAccount.setOnClickListener {
             closeAllSectionExcept(sectionAccount, headerAccountArrow, allSections)
             toggleSection(sectionAccount, headerAccountArrow)
@@ -382,10 +376,10 @@ class SettingsActivity : AppCompatActivity(){
             titleView.findViewById<TextView>(R.id.dialogTitle).text = "Resetuj dane"
             AlertDialog.Builder(this)
                 .setCustomTitle(titleView)
-                .setMessage("Czy na pewno chcesz zresetować wszystkie dane (wydatki, cele, usatwienia)?\n"
+                .setMessage("Czy na pewno chcesz zresetować wszystkie dane (wydatki, cele, ustawienia)?\n"
                         + "Dane konta użytkownika zostaną zachowane.")
                 .setPositiveButton("Tak") { _, _ ->
-                    //Dialog ładowania
+                    //Dialog Ĺ‚adowania
                     val loadingView = layoutInflater.inflate(R.layout.dialog_loading, null)
                     loadingView.findViewById<TextView>(R.id.loadingText).text = "Resetowanie danych..."
                     val loadingDialog = AlertDialog.Builder(this)
@@ -403,7 +397,7 @@ class SettingsActivity : AppCompatActivity(){
                         val settingsDao = db.settingsDao()
                         val pendingSyncDao = db.pendingSyncDao()
 
-                        //Przywróć domyślne ustawienia
+                        //PrzywrĂłÄ‡ domyĹ›lne ustawienia
                         val defaultCategories = listOf("Jedzenie","Transport","Rachunki","Rozrywka","Inne")
                         val defaultColors = mapOf(
                             "Jedzenie" to "#4CAF50",
@@ -443,7 +437,7 @@ class SettingsActivity : AppCompatActivity(){
                                 return@launch
                             }
                         }
-                        //Usuń dane powiązane z użytkownikiem
+                        //UsuĹ„ dane powiÄ…zane z uĹĽytkownikiem
                         withContext(Dispatchers.IO) {
                             budgetDao.deleteAll(userId)
                             expenseDao.deleteAll(userId)
@@ -451,13 +445,13 @@ class SettingsActivity : AppCompatActivity(){
                             savingsDao.getGoalsForUser(userId)
                                 .forEach { goal -> savingsDao.delete(goal) }
 
-                            //Wyczyść kolejkę synchronizacji
+                            //WyczyĹ›Ä‡ kolejkÄ™ synchronizacji
                             pendingSyncDao.getAll().forEach { item ->
                                 pendingSyncDao.delete(item)
                             }
                             settingsDao.insertSettings(updatedSettings)
                         }
-                        // Przywróć motyw do domyślnego (jasny)
+                        // PrzywrĂłÄ‡ motyw do domyĹ›lnego (jasny)
                         Prefs.setAppTheme(this@SettingsActivity, "light")
 
                         withContext(Dispatchers.Main) {
@@ -468,10 +462,10 @@ class SettingsActivity : AppCompatActivity(){
                                 Toast.LENGTH_SHORT
                             ).show()
 
-                            // Odśwież motyw — daj mu chwilę na zastosowanie
+                            // OdĹ›wieĹĽ motyw â€” daj mu chwilÄ™ na zastosowanie
                             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
-                            //Odśwież ekran lub wróć do Dashboard
+                            //OdĹ›wieĹĽ ekran lub wrĂłÄ‡ do Dashboard
                             val intent = Intent(this@SettingsActivity, DashboardActivity::class.java)
                             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             startActivity(intent)
@@ -483,7 +477,7 @@ class SettingsActivity : AppCompatActivity(){
                 .show()
         }
 
-        //Powrót
+        //PowrĂłt
         buttonBack.setOnClickListener {
             val intent = Intent(this, DashboardActivity::class.java)
             startActivity(intent)
@@ -498,9 +492,7 @@ class SettingsActivity : AppCompatActivity(){
                 .setCustomTitle(titleView)
                 .setMessage("Czy na pewno chcesz się wylogować z aplikacji?")
                 .setPositiveButton("Tak") { _, _ ->
-                    // Czyścimy wszystkie prefs prze Prefs.kt
-                    Prefs.resetAll(this)
-                    // Zachowujemy aktualny motyw (taki jaki był ustawiony)
+                    Prefs.clearSession(this)
                     Prefs.setAppTheme(this, savedTheme)
                     Toast.makeText(this, "Wylogowano pomyślnie", Toast.LENGTH_SHORT).show()
 
@@ -513,7 +505,7 @@ class SettingsActivity : AppCompatActivity(){
                 .show()
         }
 
-        // Fukncja przycisku usuń konto
+        // Fukncja przycisku usuĹ„ konto
         buttonDeleteAccount.setOnClickListener {
             val titleView = layoutInflater.inflate(R.layout.dialog_title, null)
             titleView.findViewById<TextView>(R.id.dialogTitle).text = "Usuń konto"
@@ -540,16 +532,17 @@ class SettingsActivity : AppCompatActivity(){
                                 throw IllegalStateException("Brak supabaseUid")
                             }
 
-                            // Najpierw usuń konto z Supabase Auth
+                            // Najpierw usuĹ„ konto z Supabase Auth
                             SupabaseAccountRepository.deleteAccount(supabaseUid)
 
                             // Dane lokalne usuwamy dopiero po sukcesie z Supabase Auth
                             withContext(Dispatchers.IO) {
-                            userDao.deleteUser(userId)
-                            AppDatabase.getDatabase(this@SettingsActivity).clearAllTables()
-                                }
-                            Prefs.resetAll(this@SettingsActivity)
+                                userDao.deleteUser(userId)
+                                AppDatabase.getDatabase(this@SettingsActivity).clearAllTables()
+                            }
 
+                            Prefs.clearAppThemeForUser(this@SettingsActivity, userId)
+                            Prefs.clearSession(this@SettingsActivity)
                             withContext(Dispatchers.Main) {
                                 loadingDialog.dismiss()
                                 Toast.makeText(
@@ -743,7 +736,7 @@ class SettingsActivity : AppCompatActivity(){
                                     setColor(colors[index % colors.size])
                                 }
 
-                                //Kliknięcie w kolor - otwiera wybór koloru
+                                //KlikniÄ™cie w kolor - otwiera wybĂłr koloru
                                 setOnClickListener {
                                     //24kolory - pastelowe + mocniejsze + neutralne
                                     val colorOptions = ColorPalette.CATEGORY_COLORS
@@ -878,7 +871,7 @@ class SettingsActivity : AppCompatActivity(){
                                                         .filter { it.isNotEmpty() }
                                                         .toMutableList()
 
-                                                    //Usuń wybraną kategorię
+                                                    //UsuĹ„ wybranÄ… kategoriÄ™
                                                     categoriesList.remove(category)
                                                     val updatedCategories =
                                                         categoriesList.joinToString(
@@ -886,14 +879,14 @@ class SettingsActivity : AppCompatActivity(){
                                                             postfix = "]"
                                                         ) { "\"$it\"" }
 
-                                                    //Nie usuwamy koloru usuniętej kategorii (historyczne dane)
+                                                    //Nie usuwamy koloru usuniÄ™tej kategorii (historyczne dane)
                                                     val categoryColors = try {
                                                         JSONObject(currentSettings.categoryColors)
                                                     } catch (e: Exception) {
                                                         JSONObject()
                                                     }
 
-                                                    //Zaktualizuj bazę, jeśli usunięto kategorię
+                                                    //Zaktualizuj bazÄ™, jeĹ›li usuniÄ™to kategoriÄ™
                                                     val updatedSettings = currentSettings.copy(
                                                         categories = updatedCategories
                                                     )
@@ -1009,7 +1002,7 @@ class SettingsActivity : AppCompatActivity(){
             val context = this@SettingsActivity
 
             withContext(Dispatchers.Main) {
-                sectionPeople.removeAllViews() // czyścimy listę przed ponownym załadowaniem
+                sectionPeople.removeAllViews() // czyĹ›cimy listÄ™ przed ponownym zaĹ‚adowaniem
             }
 
             if (settings != null) {
@@ -1168,13 +1161,13 @@ class SettingsActivity : AppCompatActivity(){
                     override fun onNothingSelected(parent: AdapterView<*>) {}
                 }
 
-            //Metody płatności
+            //Metody pĹ‚atnoĹ›ci
             val payments = listOf("Brak", "Gotówka", "Karta", "Blik", "Przelew")
             val payAdapter =
                 ArrayAdapter(this@SettingsActivity, android.R.layout.simple_spinner_item, payments)
             payAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerPayment.adapter = payAdapter
-            // Odczyt zapisanej płatności
+            // Odczyt zapisanej pĹ‚atnoĹ›ci
             if (settings != null) {
                 val index = payments.indexOf(settings.defaultPaymentMethod)
                 if (index >= 0) spinnerPayment.setSelection(index)
@@ -1226,17 +1219,14 @@ class SettingsActivity : AppCompatActivity(){
     }
 
     private fun rescheduleBillsNotifications(recurringBills: List<Expense>) {
-        val now = System.currentTimeMillis()
-
         recurringBills.forEach { bill ->
             BillsAlarmScheduler.cancelAllReminders(this@SettingsActivity, bill.id)
             if (bill.status == "op\u0142acony") return@forEach
 
-            val nextCycleDate = nextBillCycleDate(bill, now)
             BillsAlarmScheduler.scheduleAllRemindersForDate(
                 this@SettingsActivity,
                 bill.id,
-                nextCycleDate
+                bill.date
             )
         }
     }
@@ -1250,18 +1240,6 @@ class SettingsActivity : AppCompatActivity(){
         }
     }
 
-    private fun nextBillCycleDate(expense: Expense, now: Long): Long {
-        val cal = Calendar.getInstance().apply {
-            timeInMillis = expense.date
-        }
-
-        while (cal.timeInMillis < now) {
-            cal.add(Calendar.MONTH, expense.repeatInterval)
-        }
-
-        return cal.timeInMillis
-    }
-
     private fun toggleSection(section: LinearLayout, arrow: TextView) {
         if (section.visibility == View.GONE) {
 
@@ -1269,7 +1247,7 @@ class SettingsActivity : AppCompatActivity(){
             section.alpha = 0f
             section.animate().alpha(1f).setDuration(200).start()
 
-            arrow.text = "▲"
+            arrow.text = ARROW_EXPANDED
 
         } else {
 
@@ -1281,7 +1259,7 @@ class SettingsActivity : AppCompatActivity(){
                 }
                 .start()
 
-            arrow.text = "▼"
+            arrow.text = ARROW_COLLAPSED
         }
     }
 
@@ -1289,7 +1267,7 @@ class SettingsActivity : AppCompatActivity(){
         for ((section, arrow) in sections) {
             if (section != openSection) {
                 section.visibility = View.GONE
-                arrow.text = "▼"
+                arrow.text = ARROW_COLLAPSED
             }
         }
     }

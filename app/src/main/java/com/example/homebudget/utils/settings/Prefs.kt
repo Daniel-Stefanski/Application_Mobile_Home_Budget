@@ -33,6 +33,14 @@ object Prefs {
         prefs(context).edit().remove(USER_ID).apply()
     }
 
+    fun clearSession(context: Context) {
+        prefs(context).edit()
+            .remove(USER_ID)
+            .remove(KEY_SUPABASE_UID)
+            .remove(REMEMBER_ME)
+            .apply()
+    }
+
     // Zapamietaj mnie
     private const val REMEMBER_ME = "rememberMe"
 
@@ -51,12 +59,37 @@ object Prefs {
     }
 
     // Motyw aplikacji
-    private const val  APP_THEME = "APP_THEME" // "light", "dark", "system"
-    fun getAppTheme(context: Context): String =
-        prefs(context).getString(APP_THEME, "system") ?: "system"
+    private const val APP_THEME = "APP_THEME"
+
+    private fun themeKey(userId: Int): String = "${APP_THEME}_$userId"
+
+    fun getAppTheme(context: Context): String {
+        val userId = getUserId(context)
+        return if (userId != -1) {
+            getAppThemeForUser(context, userId)
+        } else {
+            prefs(context).getString(APP_THEME, "light") ?: "light"
+        }
+    }
+
+    fun getAppThemeForUser(context: Context, userId: Int): String =
+        prefs(context).getString(themeKey(userId), "light") ?: "light"
 
     fun setAppTheme(context: Context, theme: String) {
-        prefs(context).edit().putString(APP_THEME, theme).apply()
+        val userId = getUserId(context)
+        if (userId != -1) {
+            setAppThemeForUser(context, userId, theme)
+        } else {
+            prefs(context).edit().putString(APP_THEME, theme).apply()
+        }
+    }
+
+    fun setAppThemeForUser(context: Context, userId: Int, theme: String) {
+        prefs(context).edit().putString(themeKey(userId), theme).apply()
+    }
+
+    fun clearAppThemeForUser(context: Context, userId: Int) {
+        prefs(context).edit().remove(themeKey(userId)).apply()
     }
 
     // Ostatni wybrany miesiąc / rok w dashboard

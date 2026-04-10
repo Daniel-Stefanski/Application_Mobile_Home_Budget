@@ -46,11 +46,11 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var checkBoxShowPassword: CheckBox
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
         super.onCreate(savedInstanceState)
 
         NotificationHelper.createNotificationChannel(this)
         WorkScheduler.scheduleDailyCheck(this)
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         ensureNotificationPermission()
 
         restoreSupabaseUidFromSession()

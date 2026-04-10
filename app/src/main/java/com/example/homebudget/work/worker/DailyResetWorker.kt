@@ -10,6 +10,7 @@ import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
+import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -66,6 +67,14 @@ class DailyResetWorker(context: Context, workerParams: WorkerParameters)
                     )
                     // Room
                     expenseDao.updateExpense(updatedExpense)
+                    BillsAlarmScheduler.cancelAllReminders(applicationContext, updatedExpense.id)
+                    if (Prefs.isNotificationsEnabled(applicationContext)) {
+                        BillsAlarmScheduler.scheduleAllRemindersForDate(
+                            applicationContext,
+                            updatedExpense.id,
+                            updatedExpense.date
+                        )
+                    }
                     // Supabase
                     val supabaseUid = Prefs.getSupabaseUid(applicationContext)
                     if (!supabaseUid.isNullOrBlank() && updatedExpense.remoteId != null) {

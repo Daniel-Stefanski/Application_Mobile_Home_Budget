@@ -101,22 +101,6 @@
                 android:text="Pokaż/Ukryj hasła"
                 android:textSize="14sp" />
 
-            <TextView
-                android:id="@+id/textCreatedAt"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="8dp"
-                android:text="Data utworzenia konta: "
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/textLastLogin"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="4dp"
-                android:text="Ostatnie logowanie: "
-                android:textSize="14sp" />
-
             <Button
                 android:id="@+id/buttonSaveAccountChanges"
                 android:layout_width="match_parent"

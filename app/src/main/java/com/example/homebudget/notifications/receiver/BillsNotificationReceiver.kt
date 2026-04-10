@@ -12,7 +12,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -33,10 +32,19 @@ class BillsNotificationReceiver : BroadcastReceiver() {
                 if (expense.status == "opłacony") return@launch
 
                 val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-                val title = "Przypomnienie: ${expense.description ?: "Rachunek"}"
+                val isOverdueReminder = alarmSlot == 5
+                val title = if (isOverdueReminder) {
+                    "Rachunek po terminie: ${expense.description ?: "Rachunek"}"
+                } else {
+                    "Przypomnienie: ${expense.description ?: "Rachunek"}"
+                }
                 val dateStr = sdf.format(Date(expense.date))
                 val amountStr = String.format(LocaleUtils.POLISH, "%.2f", expense.amount)
-                val text = "${expense.description ?: "-"} - $amountStr zl - termin: $dateStr"
+                val text = if (isOverdueReminder) {
+                    "${expense.description ?: "-"} - $amountStr zl - termin minął: $dateStr. Oznacz rachunek jako opłacony."
+                } else {
+                    "${expense.description ?: "-"} - $amountStr zl - termin: $dateStr"
+                }
 
                 NotificationHelper.createNotificationChannel(context)
                 NotificationHelper.notify(
@@ -46,17 +54,12 @@ class BillsNotificationReceiver : BroadcastReceiver() {
                     text
                 )
 
-                if (expense.isRecurring && expense.repeatInterval > 0 && alarmSlot == 3) {
-                    BillsAlarmScheduler.cancelAllReminders(context, expense.id)
-
-                    val cal = Calendar.getInstance().apply {
-                        timeInMillis = expense.date
-                        add(Calendar.MONTH, expense.repeatInterval)
-                    }
-                    val nextDate = cal.timeInMillis
-
-                    db.expenseDao().updateDate(expense.id, nextDate)
-                    BillsAlarmScheduler.scheduleAllRemindersForDate(context, expense.id, nextDate)
+                if (alarmSlot == 4 || alarmSlot == 5) {
+                    BillsAlarmScheduler.scheduleNextOverdueReminder(
+                        context,
+                        expense.id,
+                        expense.date
+                    )
                 }
             } finally {
                 pendingResult.finish()

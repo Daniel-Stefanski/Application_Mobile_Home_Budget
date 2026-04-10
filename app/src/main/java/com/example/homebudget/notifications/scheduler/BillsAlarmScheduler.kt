@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.notifications.receiver.BillsNotificationReceiver
 import com.example.homebudget.utils.settings.Prefs
 import java.util.Calendar
@@ -60,9 +59,9 @@ object BillsAlarmScheduler {
     }
 
     fun cancelAllReminders(context: Context, expenseId: Int) {
-        cancelReminder(context, expenseId, 1)
-        cancelReminder(context, expenseId, 2)
-        cancelReminder(context, expenseId, 3)
+        for (slot in 1..5) {
+            cancelReminder(context, expenseId, slot)
+        }
     }
 
     fun scheduleAllRemindersForDate(context: Context, expenseId: Int, dateMillis: Long) {
@@ -71,22 +70,33 @@ object BillsAlarmScheduler {
         val hour = 8
         val minute = 0
 
+        val weekBefore = atFixedTime(dateMillis - 7 * DAY_MS, hour, minute)
         val twoDaysBefore = atFixedTime(dateMillis - 2 * DAY_MS, hour, minute)
         val oneDayBefore = atFixedTime(dateMillis - DAY_MS, hour, minute)
         val dayOf = atFixedTime(dateMillis, hour, minute)
 
-        scheduleReminder(context, expenseId, twoDaysBefore, 1)
-        scheduleReminder(context, expenseId, oneDayBefore, 2)
-        scheduleReminder(context, expenseId, dayOf, 3)
+        scheduleReminder(context, expenseId, weekBefore, 1)
+        scheduleReminder(context, expenseId, twoDaysBefore, 2)
+        scheduleReminder(context, expenseId, oneDayBefore, 3)
+        scheduleReminder(context, expenseId, dayOf, 4)
+
+        if (System.currentTimeMillis() > dayOf) {
+            scheduleNextOverdueReminder(context, expenseId, dateMillis)
+        }
     }
 
-    fun scheduleAllRemindersForNextCycle(context: Context, expense: Expense) {
-        val cal = Calendar.getInstance()
-        cal.timeInMillis = expense.date
-        cal.add(Calendar.MONTH, expense.repeatInterval)
-        val nextDate = cal.timeInMillis
+    fun scheduleNextOverdueReminder(context: Context, expenseId: Int, dueDateMillis: Long) {
+        if (!Prefs.isNotificationsEnabled(context)) return
 
-        scheduleAllRemindersForDate(context, expense.id, nextDate)
+        val hour = 8
+        val minute = 0
+        var triggerAtMillis = atFixedTime(dueDateMillis + DAY_MS, hour, minute)
+
+        while (triggerAtMillis <= System.currentTimeMillis()) {
+            triggerAtMillis += DAY_MS
+        }
+
+        scheduleReminder(context, expenseId, triggerAtMillis, 5)
     }
 
     private fun atFixedTime(originalMillis: Long, hour: Int, minute: Int): Long {

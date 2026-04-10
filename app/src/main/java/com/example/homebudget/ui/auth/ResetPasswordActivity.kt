@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.auth
+﻿package com.example.homebudget.ui.auth
 
 import android.app.AlertDialog
 import android.content.Intent
@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-//ResetPasswordActivity.kt – ekran resetowania hasła.
+// ResetPasswordActivity.kt - ekran resetowania hasla.
 class ResetPasswordActivity : AppCompatActivity() {
 
     private lateinit var editTextEmail: EditText
@@ -33,10 +33,8 @@ class ResetPasswordActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
         super.onCreate(savedInstanceState)
-
-        // Ekran resetu hasła zawsze będzie miał motyw jasny
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
         setContentView(R.layout.activity_reset_password)
 
@@ -62,29 +60,29 @@ class ResetPasswordActivity : AppCompatActivity() {
                 .setPositiveButton("OK", null)
                 .show()
         }
-        //Checkbox pokaż/ukryj hasło
+
         checkboxShowPassword.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 editTextNewPassword.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
             } else {
-                editTextNewPassword.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                editTextNewPassword.inputType =
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
             editTextNewPassword.setSelection(editTextNewPassword.text.length)
         }
 
-        val db = AppDatabase.Companion.getDatabase(this)
+        val db = AppDatabase.getDatabase(this)
         val userDao = db.userDao()
 
         buttonResetPassword.setOnClickListener {
             val email = editTextEmail.text.toString().trim().lowercase()
             val newPassword = editTextNewPassword.text.toString()
             val confirmPassword = editTextConfirmPassword.text.toString()
-            // Reset komunikatów
+
             editTextEmail.error = null
             editTextNewPassword.error = null
             editTextConfirmPassword.error = null
 
-            //Loader
             buttonResetPassword.isEnabled = false
             progressBar.visibility = View.VISIBLE
 
@@ -120,24 +118,27 @@ class ResetPasswordActivity : AppCompatActivity() {
                     }
                     runOnUiThread {
                         showSuccessDialog()
-                        Toast.makeText(this@ResetPasswordActivity, "✅ Hasło zresetowane!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@ResetPasswordActivity, "Hasło zresetowane!", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     runOnUiThread {
                         progressBar.visibility = View.GONE
                         buttonResetPassword.isEnabled = true
                         highlightErrorFields(true, false)
-                        Toast.makeText(this@ResetPasswordActivity, "❌ Nie znaleziono użytkownika o podanym adresie e-mail", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this@ResetPasswordActivity,
+                            "Nie znaleziono użytkownika o podanym adresie e-mail",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
         }
 
-        //Powrót do logowania
         textBackToLogin.setOnClickListener {
             val intent = Intent(this, LoginActivity::class.java)
             startActivity(intent)
-            finish() // wraca do LoginActivity
+            finish()
         }
     }
 
@@ -154,6 +155,7 @@ class ResetPasswordActivity : AppCompatActivity() {
             }
             .show()
     }
+
     private fun showFieldError(editText: EditText, message: String) {
         editText.setBackgroundResource(R.drawable.shape_search_border_error)
         editText.error = message

@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.billsplanner
+﻿package com.example.homebudget.ui.billsplanner
 
 import android.content.Context
 import android.view.LayoutInflater
@@ -12,10 +12,10 @@ import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.utils.money.MoneyFormatter
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Locale
 import java.util.Date
+import java.util.Locale
 
-//RecurringExpenseAdapter.kt – adapter dla listy cyklicznych wydatków.
+// RecurringExpenseAdapter.kt - adapter dla listy cyklicznych wydatkow.
 class RecurringExpenseAdapter(
     private var bills: List<Expense>,
     private val onEditClick: (Expense) -> Unit,
@@ -23,7 +23,7 @@ class RecurringExpenseAdapter(
     private val onStatusChange: (Expense, String) -> Unit
 ) : RecyclerView.Adapter<RecurringExpenseAdapter.BillViewHolder>() {
 
-    class BillViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView){
+    class BillViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val statusBar: View = itemView.findViewById(R.id.statusBar)
         val textDescription: TextView = itemView.findViewById(R.id.textBillDescription)
         val textAmount: TextView = itemView.findViewById(R.id.textBillAmount)
@@ -36,11 +36,19 @@ class RecurringExpenseAdapter(
         val buttonDelete: Button = itemView.findViewById(R.id.buttonDeleteBill)
     }
 
+    private fun isPaidStatus(status: String): Boolean {
+        return status.trim().lowercase().startsWith("op")
+    }
+
+    private fun isUnpaidStatus(status: String): Boolean {
+        return status.trim().lowercase().startsWith("nie")
+    }
+
     private fun getStatusColor(context: Context, status: String): Int {
-        return  when (status.lowercase()) {
-            "opłacony" -> context.getColor(R.color.statusPaid)
-            "nieopłacony" -> context.getColor(R.color.statusUnpaid)
-            else -> context.getColor(R.color.statusUnpaid)
+        return if (isPaidStatus(status)) {
+            context.getColor(R.color.statusPaid)
+        } else {
+            context.getColor(R.color.statusUnpaid)
         }
     }
 
@@ -56,7 +64,6 @@ class RecurringExpenseAdapter(
         holder.textDescription.text = "Opis: ${bill.description ?: "-"}"
         holder.textAmount.text = "Kwota: ${MoneyFormatter.formatWithCurrency(bill.amount)}"
 
-        //wyświetlamy notatkę tylko jeśli istnieje
         if (!bill.note.isNullOrBlank()) {
             holder.textNote.text = "Notatka: ${bill.note}"
             holder.textNote.visibility = View.VISIBLE
@@ -64,11 +71,10 @@ class RecurringExpenseAdapter(
             holder.textNote.visibility = View.GONE
         }
 
-        //Formatowanie daty
         val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-        val dateText = "Termin płatności: ${sdf.format(Date(bill.date))}"
+        val dateText = "Termin platnosci: ${sdf.format(Date(bill.date))}"
 
-        val daysInfo = if (bill.status =="nieopłacony") {
+        val daysInfo = if (isUnpaidStatus(bill.status)) {
             getDaysInfo(bill.date)
         } else {
             ""
@@ -80,17 +86,17 @@ class RecurringExpenseAdapter(
         }
 
         val intervalText = when (bill.repeatInterval) {
-            1 -> "co miesiąc"
-            2 -> "co 2 miesiące"
-            3 -> "co 3 miesiące"
-            6 -> "co 6 miesięcy"
-            12 -> "co 12 miesięcy"
-            else -> "co ${bill.repeatInterval} miesięcy"
+            1 -> "co miesiac"
+            2 -> "co 2 miesiace"
+            3 -> "co 3 miesiace"
+            6 -> "co 6 miesiecy"
+            12 -> "co 12 miesiecy"
+            else -> "co ${bill.repeatInterval} miesiecy"
         }
-        holder.textRecurring.text = "Powtarza się: $intervalText"
+        holder.textRecurring.text = "Powtarza sie: $intervalText"
 
         val context = holder.itemView.context
-        if (bill.status == "nieopłacony") {
+        if (isUnpaidStatus(bill.status)) {
             holder.buttonMarkPaid.visibility = View.VISIBLE
             holder.buttonMarkPaid.setOnClickListener { onStatusChange(bill, "opłacony") }
         } else {
@@ -112,6 +118,7 @@ class RecurringExpenseAdapter(
         bills = newBills
         notifyDataSetChanged()
     }
+
     private fun getDaysInfo(targetMillis: Long): String {
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -131,11 +138,11 @@ class RecurringExpenseAdapter(
         val diffDays = ((target - today) / (24 * 60 * 60 * 1000)).toInt()
 
         return when {
-            diffDays == 0 -> "⏰ dziś"
-            diffDays == 1 -> "⏳ jutro"
-            diffDays > 1 -> "⏳ za $diffDays dni"
-            diffDays == -1 -> "⚠\uFE0F wczoraj"
-            diffDays < -1 -> "⚠\uFE0F po terminie"
+            diffDays == 0 -> "dziś"
+            diffDays == 1 -> "jutro"
+            diffDays > 1 -> "za $diffDays dni"
+            diffDays == -1 -> "wczoraj"
+            diffDays < -1 -> "po terminie"
             else -> ""
         }
     }

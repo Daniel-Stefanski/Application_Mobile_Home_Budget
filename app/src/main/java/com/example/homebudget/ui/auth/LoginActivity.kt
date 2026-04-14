@@ -27,6 +27,7 @@ import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.notifications.NotificationHelper
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.settings.Prefs
+import com.example.homebudget.utils.settings.ThemeHelper
 import com.example.homebudget.work.scheduler.WorkScheduler
 import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +59,7 @@ class LoginActivity : AppCompatActivity() {
         val rememberMe = Prefs.isRememberMeEnabled(this)
         val savedUserId = Prefs.getUserId(this)
         if (rememberMe && savedUserId != -1) {
+            ThemeHelper.applySavedTheme(Prefs.getAppTheme(this))
             WorkSchedulerSupabase.scheduleSupabaseSync(this)
             startActivity(Intent(this, DashboardActivity::class.java).apply {
                 putExtra("USER_ID", savedUserId)
@@ -167,6 +169,7 @@ class LoginActivity : AppCompatActivity() {
         }
         Prefs.setUserId(this, userId)
         Prefs.setRememberMe(this, rememberMe)
+        ThemeHelper.applySavedTheme(Prefs.getAppTheme(this))
         WorkSchedulerSupabase.scheduleSupabaseSync(this)
 
         withContext(Dispatchers.Main) {

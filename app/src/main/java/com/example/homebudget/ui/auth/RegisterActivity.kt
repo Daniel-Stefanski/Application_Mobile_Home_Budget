@@ -29,6 +29,7 @@ import com.example.homebudget.data.entity.User
 import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.settings.Prefs
+import com.example.homebudget.utils.settings.ThemeHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -218,6 +219,7 @@ class RegisterActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         Prefs.setUserId(this@RegisterActivity, userId)
                         Prefs.setAppThemeForUser(this@RegisterActivity, userId, "light")
+                        ThemeHelper.applySavedTheme(Prefs.getAppTheme(this@RegisterActivity))
                     }
 
                     val defaultSettings = Settings(

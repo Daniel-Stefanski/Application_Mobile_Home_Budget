@@ -49,6 +49,7 @@ import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
+import com.example.homebudget.utils.settings.ThemeHelper
 import com.github.mikephil.charting.charts.PieChart
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
@@ -88,13 +89,8 @@ class DashboardActivity : AppCompatActivity() {
     private var selectedMonth = LocalDate.now().monthValue
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeHelper.applySavedTheme(Prefs.getAppTheme(this))
         super.onCreate(savedInstanceState)
-        //Wczytanie i zastosowanie wybranego motywu aplikacji
-        when (Prefs.getAppTheme(this)) {
-            "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        }
         // Dopiero layout
         setContentView(R.layout.activity_dashboard)
 

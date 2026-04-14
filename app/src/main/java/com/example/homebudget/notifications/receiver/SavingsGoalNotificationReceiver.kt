@@ -38,19 +38,21 @@ class SavingsGoalNotificationReceiver : BroadcastReceiver() {
                 }
 
                 val daysText = when (slot) {
-                    1 -> "miesiac"
-                    2 -> "2 tygodnie"
-                    3 -> "1 tydzien"
-                    4 -> "2 dni"
-                    5 -> "1 dzien"
+                    1 -> "za 30 dni"
+                    2 -> "za 14 dni"
+                    3 -> "za 7 dni"
+                    4 -> "za 2 dni"
+                    5 -> "za 1 dzien"
                     6 -> "dzisiaj"
                     else -> null
                 }
-                val title = goal.title
+                val savedAmount = String.format(Locale.forLanguageTag("pl-PL"), "%.2f", goal.savedAmount)
+                val targetAmount = String.format(Locale.forLanguageTag("pl-PL"), "%.2f", goal.targetAmount)
+                val title = "Zbliza sie termin celu oszczednosciowego"
                 val text = if (daysText != null) {
-                    "Termin: $dateStr ($daysText). Postep: $progress%."
+                    "${goal.title} • $savedAmount zl / $targetAmount zl • Termin: $dateStr ($daysText) • Postep: $progress%"
                 } else {
-                    "Termin: $dateStr. Postep: $progress%."
+                    "${goal.title} • $savedAmount zl / $targetAmount zl • Termin: $dateStr • Postep: $progress%"
                 }
 
                 NotificationHelper.createNotificationChannel(context)

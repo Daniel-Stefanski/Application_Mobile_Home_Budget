@@ -42,8 +42,8 @@ class DashboardBudgetNotificationReceiver : BroadcastReceiver() {
                     NotificationHelper.notifyBudget(
                         context,
                         777777,
-                        "Przekroczyles budzet!",
-                        "Budzet zostal przekroczony o %.2f zl.".format(total - budget)
+                        "Przekroczyłes budżet!",
+                        "Budżet został przekroczony o %.2f zł.".format(total - budget)
                     )
                 }
             } finally {

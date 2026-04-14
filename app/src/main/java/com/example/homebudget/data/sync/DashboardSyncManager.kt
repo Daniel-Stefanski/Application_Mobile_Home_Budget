@@ -48,9 +48,7 @@ object DashboardSyncManager {
                 }
 
                 val remoteExpenseIds = remoteExpenses.mapNotNull { it.id }
-                if (remoteExpenseIds.isEmpty()) {
-                    expenseDao.deleteAll(localUserId)
-                } else {
+                if (remoteExpenseIds.isNotEmpty()) {
                     expenseDao.deleteNotInRemoteIds(localUserId, remoteExpenseIds)
                 }
 
@@ -88,9 +86,7 @@ object DashboardSyncManager {
                 }
 
                 val remoteGoalIds = remoteGoals.map { it.id }
-                if (remoteGoals.isEmpty()) {
-                    savingsGoalDao.deleteAll(localUserId)
-                } else {
+                if (remoteGoalIds.isNotEmpty()) {
                     savingsGoalDao.deleteNotInRemoteIds(localUserId, remoteGoalIds)
                 }
 
@@ -116,9 +112,7 @@ object DashboardSyncManager {
                 }
 
                 val remoteContributionIds = remoteContributions.map { it.id }
-                if (remoteContributions.isEmpty()) {
-                    contributionDao.deleteAllForUser(localUserId)
-                } else {
+                if (remoteContributionIds.isNotEmpty()) {
                     contributionDao.deleteNotInRemoteIds(localUserId, remoteContributionIds)
                 }
             }

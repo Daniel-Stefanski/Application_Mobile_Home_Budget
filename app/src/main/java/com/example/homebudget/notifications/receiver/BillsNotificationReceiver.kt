@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.notifications.NotificationHelper
-import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.CoroutineScope
@@ -29,21 +28,22 @@ class BillsNotificationReceiver : BroadcastReceiver() {
                 val db = AppDatabase.getDatabase(context)
                 val expense = db.expenseDao().getExpenseById(expenseId) ?: return@launch
 
-                if (expense.status == "opłacony") return@launch
+                if (isPaidStatus(expense.status)) return@launch
 
                 val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-                val isOverdueReminder = alarmSlot == 5
+                val isOverdueReminder = alarmSlot in 5..7
                 val title = if (isOverdueReminder) {
-                    "Rachunek po terminie: ${expense.description ?: "Rachunek"}"
+                    "Przypomnienie o zaległym terminie płatności"
                 } else {
-                    "Przypomnienie: ${expense.description ?: "Rachunek"}"
+                    "Przypomnienie o terminie płatności"
                 }
                 val dateStr = sdf.format(Date(expense.date))
                 val amountStr = String.format(LocaleUtils.POLISH, "%.2f", expense.amount)
+                val billName = expense.description?.takeIf { it.isNotBlank() } ?: "Rachunek"
                 val text = if (isOverdueReminder) {
-                    "${expense.description ?: "-"} - $amountStr zl - termin minął: $dateStr. Oznacz rachunek jako opłacony."
+                    "$billName • $amountStr zl • Termin płatności: $dateStr. Opłać rachunek i oznacz go jako opłacony."
                 } else {
-                    "${expense.description ?: "-"} - $amountStr zl - termin: $dateStr"
+                    "$billName • $amountStr zl • Termin płatności: $dateStr"
                 }
 
                 NotificationHelper.createNotificationChannel(context)
@@ -53,17 +53,13 @@ class BillsNotificationReceiver : BroadcastReceiver() {
                     title,
                     text
                 )
-
-                if (alarmSlot == 4 || alarmSlot == 5) {
-                    BillsAlarmScheduler.scheduleNextOverdueReminder(
-                        context,
-                        expense.id,
-                        expense.date
-                    )
-                }
             } finally {
                 pendingResult.finish()
             }
         }
+    }
+
+    private fun isPaidStatus(status: String): Boolean {
+        return status.trim().lowercase().startsWith("op")
     }
 }

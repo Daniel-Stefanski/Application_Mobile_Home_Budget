@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 
 object Prefs {
     private const val KEY_SUPABASE_UID = "SUPABASE_UID"
+    private const val KEY_PENDING_PASSWORD_RESET_EMAIL = "PENDING_PASSWORD_RESET_EMAIL"
 
     fun setSupabaseUid(context: Context, uid: String) {
         prefs(context).edit().putString(KEY_SUPABASE_UID, uid).apply()
@@ -12,6 +13,18 @@ object Prefs {
 
     fun getSupabaseUid(context: Context): String? {
         return prefs(context).getString(KEY_SUPABASE_UID, null)
+    }
+
+    fun setPendingPasswordResetEmail(context: Context, email: String) {
+        prefs(context).edit().putString(KEY_PENDING_PASSWORD_RESET_EMAIL, email).apply()
+    }
+
+    fun getPendingPasswordResetEmail(context: Context): String? {
+        return prefs(context).getString(KEY_PENDING_PASSWORD_RESET_EMAIL, null)
+    }
+
+    fun clearPendingPasswordResetEmail(context: Context) {
+        prefs(context).edit().remove(KEY_PENDING_PASSWORD_RESET_EMAIL).apply()
     }
 
     private const val PREF_NAME = "HomeBudgetPrefs"

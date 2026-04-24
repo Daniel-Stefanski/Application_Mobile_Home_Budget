@@ -68,6 +68,20 @@
         <activity android:name=".ui.auth.ResetPasswordActivity"
             android:screenOrientation="portrait"
             tools:ignore="LockedOrientationActivity"/>
+        <activity
+            android:name=".ui.auth.SetNewPasswordActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="homebudget"
+                    android:host="reset-password"/>
+            </intent-filter>
+        </activity>
         <activity android:name=".ui.auth.RegisterActivity"
             android:screenOrientation="portrait"
             tools:ignore="LockedOrientationActivity"/>

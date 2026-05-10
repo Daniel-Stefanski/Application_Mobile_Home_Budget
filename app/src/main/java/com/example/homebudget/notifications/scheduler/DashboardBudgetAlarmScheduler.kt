@@ -10,6 +10,11 @@ import com.example.homebudget.utils.settings.Prefs
 import java.util.Calendar
 
 object DashboardBudgetAlarmScheduler {
+    fun canScheduleExactAlarm(context: Context): Boolean {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+    }
+
     private fun pendingIntentFor(context: Context): PendingIntent {
         val intent = Intent(context, DashboardBudgetNotificationReceiver::class.java)
         val requestCode = 999999
@@ -38,8 +43,8 @@ object DashboardBudgetAlarmScheduler {
         }
 
         try {
-            val canUseExactAlarm = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                alarmManager.canScheduleExactAlarms()
+            val canUseExactAlarm = canScheduleExactAlarm(context)
+            alarmManager.cancel(pi)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && canUseExactAlarm) {
                 alarmManager.setExactAndAllowWhileIdle(

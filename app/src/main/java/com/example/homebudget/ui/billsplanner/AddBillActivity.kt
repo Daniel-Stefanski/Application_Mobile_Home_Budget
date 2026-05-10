@@ -28,6 +28,7 @@ import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
 import com.example.homebudget.notifications.NotificationHelper
+import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.money.MoneyUtils
@@ -53,10 +54,19 @@ class AddBillActivity : AppCompatActivity() {
     private lateinit var buttonCancel: Button
     private lateinit var spinnerInterval: Spinner
     private lateinit var checkboxMarkPaid: CheckBox
+    private lateinit var loadingDialog: LoadingDialogController
     private var editBillId: Int? = null
+    private val intervalOptions = listOf("1 miesiąc", "2 miesiące", "3 miesiące", "6 miesięcy", "12 miesięcy")
 
     private var selectedDate: Long = System.currentTimeMillis()
     private var userId: Int = -1
+    private var originalDescription: String? = null
+    private var originalAmount: Double? = null
+    private var originalNote: String? = null
+    private var originalDate: Long? = null
+    private var originalRepeatInterval: Int? = null
+    private var originalPaid: Boolean? = null
+    private var isEditDataLoaded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +87,8 @@ class AddBillActivity : AppCompatActivity() {
         buttonSaveBill = findViewById(R.id.buttonSaveBill)
         buttonCancel = findViewById(R.id.buttonCancel)
         checkboxMarkPaid = findViewById(R.id.checkboxMarkPaid)
+        loadingDialog = LoadingDialogController(this)
+        updateSaveButtonState(false)
 
         editBillId = intent.getIntExtra("EDIT_BILL_ID", -1).takeIf { it != -1 }
         if (editBillId != null) {
@@ -104,7 +116,7 @@ class AddBillActivity : AppCompatActivity() {
 
         //opcje wyboru interwału
         val intervals = listOf("1 miesiąc", "2 miesiące", "3 miesiące", "6 miesięcy", "12 miesięcy")
-        val adapterSpinner = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, intervals)
+        val adapterSpinner = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, intervalOptions)
         spinnerInterval.adapter = adapterSpinner
 
         buttonSelectDate.setOnClickListener {
@@ -121,6 +133,7 @@ class AddBillActivity : AppCompatActivity() {
                     newCal.set(year, month, day)
                     selectedDate = newCal.timeInMillis
                     updateSelectedDateLabel()
+                    validateForm()
                 },
                 cal.get(Calendar.YEAR),
                 cal.get(Calendar.MONTH),
@@ -190,8 +203,11 @@ class AddBillActivity : AppCompatActivity() {
                 status = statusValue
             )
 
+            buttonSaveBill.isEnabled = false
+            loadingDialog.show(if (editBillId == null) "Zapisywanie rachunku..." else "Aktualizowanie rachunku...")
             lifecycleScope.launch {
-                val db = AppDatabase.getDatabase(this@AddBillActivity)
+                try {
+                    val db = AppDatabase.getDatabase(this@AddBillActivity)
                 withContext(Dispatchers.IO) {
                     if (editBillId == null) {
                         val localId = db.expenseDao().insertExpense(expense).toInt()
@@ -312,6 +328,10 @@ class AddBillActivity : AppCompatActivity() {
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                     startActivity(intent)
                     finish()
+                    }
+                } finally {
+                    loadingDialog.hide()
+                    validateForm()
                 }
             }
         }
@@ -336,7 +356,18 @@ class AddBillActivity : AppCompatActivity() {
             inputNote.setText(bill.note)
             selectedDate = bill.date
             updateSelectedDateLabel()
-            checkboxMarkPaid.isChecked = bill.status == "opłacony"
+            val intervalIndex = intervalOptions.indexOfFirst { it.startsWith("${bill.repeatInterval} ") }
+            if (intervalIndex >= 0) {
+                spinnerInterval.setSelection(intervalIndex, false)
+            }
+            checkboxMarkPaid.isChecked = isPaidStatus(bill.status)
+            originalDescription = bill.description?.trim().orEmpty()
+            originalAmount = bill.amount
+            originalNote = bill.note?.trim().orEmpty()
+            originalDate = bill.date
+            originalRepeatInterval = bill.repeatInterval
+            originalPaid = isPaidStatus(bill.status)
+            isEditDataLoaded = true
             validateForm()
         }
     }
@@ -398,6 +429,8 @@ class AddBillActivity : AppCompatActivity() {
 
         inputDescription.addTextChangedListener { watcher() }
         inputAmount.addTextChangedListener { watcher() }
+        inputNote.addTextChangedListener { watcher() }
+        checkboxMarkPaid.setOnCheckedChangeListener { _, _ -> watcher() }
 
         spinnerInterval.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) = watcher()
@@ -415,10 +448,53 @@ class AddBillActivity : AppCompatActivity() {
         val descriptionValid = inputDescription.text.isNotBlank()
         val amountValid = MoneyUtils.parseAmount(inputAmount.text.toString())?.let { it > 0 } == true
         val intervalValid = spinnerInterval.selectedItem != null
+        val hasChanges = if (editBillId != null) {
+            isEditDataLoaded && hasFormChanges()
+        } else {
+            true
+        }
 
-        buttonSaveBill.isEnabled = descriptionValid && amountValid && intervalValid
+        updateSaveButtonState(descriptionValid && amountValid && intervalValid && hasChanges)
 
         if (!amountValid) inputAmount.error = "Podaj prawidłową kwotę" else inputAmount.error = null
         if (!descriptionValid) inputDescription.error = "Wpisz opis" else inputDescription.error = null
+    }
+
+    private fun hasFormChanges(): Boolean {
+        val currentDescription = inputDescription.text.toString().trim()
+        val currentAmount = MoneyUtils.parseAmount(inputAmount.text.toString())
+        val currentNote = inputNote.text.toString().trim()
+        val currentRepeatInterval = spinnerInterval.selectedItem
+            ?.toString()
+            ?.substringBefore(" ")
+            ?.toIntOrNull()
+        val currentPaid = checkboxMarkPaid.isChecked
+
+        val descriptionChanged = currentDescription != (originalDescription ?: "")
+        val amountChanged = currentAmount != null &&
+            kotlin.math.abs(currentAmount - (originalAmount ?: 0.0)) > 0.0001
+        val noteChanged = currentNote != (originalNote ?: "")
+        val dateChanged = !isSameCalendarDay(selectedDate, originalDate ?: selectedDate)
+        val intervalChanged = currentRepeatInterval != originalRepeatInterval
+        val paidChanged = currentPaid != (originalPaid ?: false)
+
+        return descriptionChanged || amountChanged || noteChanged || dateChanged || intervalChanged || paidChanged
+    }
+
+    private fun isSameCalendarDay(first: Long, second: Long): Boolean {
+        val firstCalendar = Calendar.getInstance().apply { timeInMillis = first }
+        val secondCalendar = Calendar.getInstance().apply { timeInMillis = second }
+
+        return firstCalendar.get(Calendar.YEAR) == secondCalendar.get(Calendar.YEAR) &&
+            firstCalendar.get(Calendar.DAY_OF_YEAR) == secondCalendar.get(Calendar.DAY_OF_YEAR)
+    }
+
+    private fun isPaidStatus(status: String?): Boolean {
+        return status?.trim()?.startsWith("op", ignoreCase = true) == true
+    }
+
+    private fun updateSaveButtonState(isEnabled: Boolean) {
+        buttonSaveBill.isEnabled = isEnabled
+        buttonSaveBill.alpha = if (isEnabled) 1f else 0.45f
     }
 }

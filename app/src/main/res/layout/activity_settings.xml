@@ -274,6 +274,30 @@
                 android:text="Powiadomienia systemowe"
                 android:textSize="14sp"
                 android:layout_marginBottom="6dp"/>
+            <TextView
+                android:id="@+id/textExactAlarmInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Aktualne godziny powiadomień:&#10;• Budżet: 19:00&#10;• Rachunki planowane: 08:00&#10;• Cele oszczędnościowe: 08:00"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp"/>
+            <TextView
+                android:id="@+id/textExactAlarmStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Dokładne alarmy pomagają ograniczyć opóźnienia powiadomień na niektórych telefonach."
+                android:textColor="#666666"
+                android:textSize="13sp"/>
+            <Button
+                android:id="@+id/buttonExactAlarmSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/buttonBackground"
+                android:text="Ustaw dokładne alarmy"
+                android:textColor="@color/buttonText"/>
             <!--Domyślna kategoria-->
             <TextView
                 android:layout_width="match_parent"

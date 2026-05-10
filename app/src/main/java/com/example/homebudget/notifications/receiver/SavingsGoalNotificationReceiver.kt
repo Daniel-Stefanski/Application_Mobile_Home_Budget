@@ -1,4 +1,4 @@
-package com.example.homebudget.notifications.receiver
+﻿package com.example.homebudget.notifications.receiver
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -42,17 +42,17 @@ class SavingsGoalNotificationReceiver : BroadcastReceiver() {
                     2 -> "za 14 dni"
                     3 -> "za 7 dni"
                     4 -> "za 2 dni"
-                    5 -> "za 1 dzien"
+                    5 -> "za 1 dzień"
                     6 -> "dzisiaj"
                     else -> null
                 }
                 val savedAmount = String.format(Locale.forLanguageTag("pl-PL"), "%.2f", goal.savedAmount)
                 val targetAmount = String.format(Locale.forLanguageTag("pl-PL"), "%.2f", goal.targetAmount)
-                val title = "Zbliza sie termin celu oszczednosciowego"
+                val title = "Zbliża się termin celu oszczędnościowego"
                 val text = if (daysText != null) {
-                    "${goal.title} • $savedAmount zl / $targetAmount zl • Termin: $dateStr ($daysText) • Postep: $progress%"
+                    "${goal.title} • $savedAmount zł / $targetAmount zł • Termin: $dateStr ($daysText) • Postęp: $progress%"
                 } else {
-                    "${goal.title} • $savedAmount zl / $targetAmount zl • Termin: $dateStr • Postep: $progress%"
+                    "${goal.title} • $savedAmount zł / $targetAmount zł • Termin: $dateStr • Postęp: $progress%"
                 }
 
                 NotificationHelper.createNotificationChannel(context)
@@ -64,3 +64,4 @@ class SavingsGoalNotificationReceiver : BroadcastReceiver() {
         }
     }
 }
+

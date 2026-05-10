@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.statistics
+﻿package com.example.homebudget.ui.statistics
 
 import android.content.res.Configuration
 import android.graphics.Color
@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.ui.common.loading.LoadingOverlayController
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.settings.Prefs
 import com.github.mikephil.charting.charts.BarChart
@@ -55,6 +56,7 @@ class StatisticsActivity : AppCompatActivity() {
     private lateinit var textPersonChartTitle: TextView
     private lateinit var personBarChart: BarChart
     private lateinit var buttonBackToMain: Button
+    private lateinit var loadingOverlay: LoadingOverlayController
 
     private var userId: Int = -1
     private var selectedYear = LocalDate.now().year
@@ -62,6 +64,7 @@ class StatisticsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_statistics)
+        loadingOverlay = LoadingOverlayController(this)
 
         //Wczytaj userId
         userId = Prefs.getUserId(this)
@@ -87,7 +90,7 @@ class StatisticsActivity : AppCompatActivity() {
             }
         }
         buttonBackToMain.setOnClickListener {
-            finish()// cofnięcie do DashboardActivity
+            finish()// cofniÄ™cie do DashboardActivity
         }
     }
 
@@ -138,319 +141,267 @@ class StatisticsActivity : AppCompatActivity() {
                 Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
         barChart.description.isEnabled = false
-        barChart.legend.isEnabled = true // później ustawimy legendę
+        barChart.legend.isEnabled = false
         barChart.setDrawGridBackground(false)
         barChart.setTouchEnabled(true)
 
-        // Tylko jedna oś Y
+        // Tylko jedna oĹ› Y
         barChart.axisRight.isEnabled = false
 
         // Kolory osi
         barChart.axisLeft.textColor = if (isDark) Color.WHITE else Color.BLACK
         barChart.xAxis.textColor = if (isDark) Color.WHITE else Color.BLACK
 
-        // Usunięcie linii pomocniczych (opcjonalnie)
+        // UsuniÄ™cie linii pomocniczych (opcjonalnie)
         barChart.axisLeft.setDrawGridLines(false)
         barChart.xAxis.setDrawGridLines(false)
 
-        // Oś X – miesiące
+        // OĹ› X â€“ miesiÄ…ce
         barChart.xAxis.position = XAxis.XAxisPosition.BOTTOM
     }
 
     private fun loadYearStatistics() {
+        loadingOverlay.show("Ładowanie statystyk rocznych...")
         lifecycleScope.launch {
-            val db = AppDatabase.Companion.getDatabase(this@StatisticsActivity)
-            val expenseDao = db.expenseDao()
-            val budgetDao = db.monthlyBudgetDao()
+            try {
+                val db = AppDatabase.Companion.getDatabase(this@StatisticsActivity)
+                val expenseDao = db.expenseDao()
+                val budgetDao = db.monthlyBudgetDao()
 
-            var totalYearSpent = 0.0
-            var totalYearBudgetSum = 0.0
-            var highestMonthlyBudget = 0.0
-            var highestMonthlySpent = 0.0
+                var totalYearSpent = 0.0
+                var totalYearBudgetSum = 0.0
+                var highestMonthlyBudget = 0.0
+                var highestMonthlySpent = 0.0
 
-            val stackedEntries = ArrayList<BarEntry>() // Tworzy słupek który się nadpisuje danymi
-            //i = indeks grupy (0..11), month = 1..12 dla dat
-            for (i in 0 until 12) {
-                val month = i + 1
-                val start = getStartOfMonth(month)
-                val end = getEndOfMonth(month)
+                val stackedEntries = ArrayList<BarEntry>()
+                for (i in 0 until 12) {
+                    val month = i + 1
+                    val start = getStartOfMonth(month)
+                    val end = getEndOfMonth(month)
 
-                val expenses = withContext(Dispatchers.IO) {
-                    expenseDao.getExpensesForUser(userId).filter { it.date in start..end }
-                }
-                val spent = expenses.sumOf { it.amount }
-                val budget = withContext(Dispatchers.IO) {
-                    budgetDao.getBudgetForMonth(userId, selectedYear, month)?.budget ?: 0.0
-                }
-                totalYearSpent += spent
-                totalYearBudgetSum += budget
-                highestMonthlyBudget = maxOf(highestMonthlyBudget, budget)
-                highestMonthlySpent = maxOf(highestMonthlySpent, spent)
-                val spentInside = minOf(spent, budget).toFloat() // Niebieski - wydatki do limitu budżetu
-                val geenRest = maxOf(0.0, budget - spent).toFloat() // Zielony - pełna wysokość budżetu
-                val exceed = maxOf(0.0, spent - budget).toFloat() // Czerwony - przekroczenie budżetu
-                stackedEntries.add(
-                    BarEntry(
-                        i.toFloat(),
-                        floatArrayOf(spentInside, geenRest, exceed)
+                    val expenses = withContext(Dispatchers.IO) {
+                        expenseDao.getExpensesForUser(userId).filter { it.date in start..end }
+                    }
+                    val spent = expenses.sumOf { it.amount }
+                    val budget = withContext(Dispatchers.IO) {
+                        budgetDao.getBudgetForMonth(userId, selectedYear, month)?.budget ?: 0.0
+                    }
+
+                    totalYearSpent += spent
+                    totalYearBudgetSum += budget
+                    highestMonthlyBudget = maxOf(highestMonthlyBudget, budget)
+                    highestMonthlySpent = maxOf(highestMonthlySpent, spent)
+
+                    val spentInside = minOf(spent, budget).toFloat()
+                    val budgetRest = maxOf(0.0, budget - spent).toFloat()
+                    val exceed = maxOf(0.0, spent - budget).toFloat()
+                    stackedEntries.add(
+                        BarEntry(
+                            i.toFloat(),
+                            floatArrayOf(spentInside, budgetRest, exceed)
+                        )
                     )
-                )
-            }
-
-            textYearTotal.text = "Suma wydatków: ${MoneyFormatter.formatWithCurrency(totalYearSpent)}"
-            textYearBudget.text = "Budżet: ${MoneyFormatter.formatWithCurrency(totalYearBudgetSum)}"
-
-            if (totalYearSpent <= totalYearBudgetSum) {
-                val saved = totalYearBudgetSum - totalYearSpent //zaoszczędzono
-                textYearSavings.text = "Zaoszczędzono: ${MoneyFormatter.formatWithCurrency(saved)}"
-                textYearSavings.setTextColor(Color.parseColor("#2ECC71"))
-            } else {
-                val exceeded = totalYearSpent - totalYearBudgetSum //przekroczono
-                textYearSavings.text = "Przekroczono: ${MoneyFormatter.formatWithCurrency(exceeded)}"
-                textYearSavings.setTextColor(Color.parseColor("#E74C3C"))
-            }
-            //Obliczamy max wartość do skali os Y
-            val maxValue = maxOf(highestMonthlyBudget, highestMonthlySpent)
-            val step = 500f //odstępy pomiędzy wartościami
-            val roundedMax = (Math.ceil(maxValue / step) * step).toFloat()
-
-            // Kolory słupków
-            val stackedSet = BarDataSet(stackedEntries, "").apply {
-                colors = listOf(
-                    Color.parseColor("#3498DB"), // pastelowy niebieski
-                    Color.parseColor("#2ECC71"), // pastelowy zielony
-                    Color.parseColor("#E74C3C") // pastelowy czerwony
-                )
-                stackLabels = arrayOf("Wydatki", "Budżet", "Przekroczenie")
-                setDrawValues(false) // NIE pokazuj liczby nad słupkiem
-            }
-
-            //Nazwy miesięcy (indeks 0 = "Sty", 1 = "Lut", ...)
-            val months = listOf("Sty", "Lut", "Mar", "Kwi", "Maj", "Cze",
-                "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru")
-
-            barChart.xAxis.apply {
-                valueFormatter = IndexAxisValueFormatter(months)
-                granularity = 1f
-                labelCount = 12
-                textSize = 12f
-                xOffset = 10f
-                yOffset = 5f
-                position = XAxis.XAxisPosition.BOTTOM
-            }
-            //Ukryj niepotrzebne wartości
-            barChart.axisLeft.apply {
-                setDrawGridLines(false)
-            }
-            barChart.axisRight.isEnabled = false
-            barChart.description.isEnabled = false
-
-            //Kolor zależny od motywu
-            val isDark = resources.configuration.uiMode and
-                    Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-            val axisColor = if (isDark) Color.parseColor("#A88DFF") else Color.parseColor("#835BFF") //linia główna
-            val gridColor = if (isDark) Color.parseColor("#444444") else Color.parseColor("#DDDDDD") //linie pomocnicze
-            val textColor = if (isDark) Color.WHITE else Color.BLACK
-            barChart.axisLeft.apply { //oś Y
-                axisMinimum = 0f
-                axisMaximum = roundedMax
-                granularity = step
-                setLabelCount((roundedMax / step).toInt() + 1, true)
-                // os Y
-                setDrawAxisLine(true) // rysuje linię osi Y
-                axisLineColor = axisColor // kolor osi (fiolet na screenie)
-                axisLineWidth = 2f //grubość linii
-                // Linie pomocnicze
-                setDrawGridLines(true) // rysuje linie poziome
-                setGridColor(gridColor) // kolor linii pomocniczych (żółty)
-                gridLineWidth = 1f // grubość linii
-                this.textColor = textColor
-            }
-            barChart.xAxis.apply {
-                setDrawAxisLine(true) // rysuje linię osi X
-                axisLineColor = axisColor // kolor osi (fiolet na screenie)
-                axisLineWidth = 2f
-                setDrawGridLines(false) // NIE chcemy pionowych linii
-                this.textColor = textColor
-            }
-            val barData = BarData(stackedSet)
-            barData.barWidth = 0.9f // 1słupek -> szeroki
-            barChart.data = barData
-
-            //Obsługa kliknięcia w miesiąc na wykresie
-            barChart.setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
-                override fun onValueSelected(e: Entry?, h: Highlight?) {
-                    if (e == null) return
-                    val monthIndex = e.x.toInt() //0-11
-                    findViewById<TextView>(R.id.textHintClickMonth).visibility = View.GONE
-                    showMonthDetails(monthIndex)
                 }
 
-                override fun onNothingSelected() {}
-            })
+                textYearTotal.text = "Wydatki: ${MoneyFormatter.formatWithCurrency(totalYearSpent)}"
+                textYearBudget.text = "Budżet: ${MoneyFormatter.formatWithCurrency(totalYearBudgetSum)}"
 
-            barChart.xAxis.axisMinimum = -0.5f
-            barChart.xAxis.axisMaximum = 11.5f
+                if (totalYearSpent <= totalYearBudgetSum) {
+                    val saved = totalYearBudgetSum - totalYearSpent
+                    textYearSavings.text = "Zaoszczędzono: ${MoneyFormatter.formatWithCurrency(saved)}"
+                    textYearSavings.setTextColor(Color.parseColor("#2ECC71"))
+                } else {
+                    val exceeded = totalYearSpent - totalYearBudgetSum
+                    textYearSavings.text = "Przekroczono: ${MoneyFormatter.formatWithCurrency(exceeded)}"
+                    textYearSavings.setTextColor(Color.parseColor("#E74C3C"))
+                }
 
-            //Legenda
-            barChart.legend.textColor = if (isDark) Color.WHITE else Color.BLACK
-            //Odśwież wykres
-            barChart.animateY(800)
-            barChart.invalidate()
+                val maxValue = maxOf(highestMonthlyBudget, highestMonthlySpent)
+                val step = 500f
+                val roundedMax = (ceil(maxValue / step) * step).toFloat()
+
+                val stackedSet = BarDataSet(stackedEntries, "").apply {
+                    colors = listOf(
+                        Color.parseColor("#3498DB"),
+                        Color.parseColor("#2ECC71"),
+                        Color.parseColor("#E74C3C")
+                    )
+                    stackLabels = arrayOf("Wydatki", "Budżet", "Przekroczenie")
+                    setDrawValues(false)
+                }
+
+                val months = listOf("Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru")
+                barChart.xAxis.apply {
+                    valueFormatter = IndexAxisValueFormatter(months)
+                    granularity = 1f
+                    labelCount = 12
+                    textSize = 12f
+                    xOffset = 10f
+                    yOffset = 5f
+                    position = XAxis.XAxisPosition.BOTTOM
+                }
+                barChart.axisLeft.setDrawGridLines(false)
+                barChart.axisRight.isEnabled = false
+                barChart.description.isEnabled = false
+
+                val isDark = resources.configuration.uiMode and
+                    Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                val axisColor = if (isDark) Color.parseColor("#A88DFF") else Color.parseColor("#835BFF")
+                val gridColor = if (isDark) Color.parseColor("#444444") else Color.parseColor("#DDDDDD")
+                val textColor = if (isDark) Color.WHITE else Color.BLACK
+
+                barChart.axisLeft.apply {
+                    axisMinimum = 0f
+                    axisMaximum = roundedMax
+                    granularity = step
+                    setLabelCount((roundedMax / step).toInt() + 1, true)
+                    setDrawAxisLine(true)
+                    axisLineColor = axisColor
+                    axisLineWidth = 2f
+                    setDrawGridLines(true)
+                    setGridColor(gridColor)
+                    gridLineWidth = 1f
+                    this.textColor = textColor
+                }
+                barChart.xAxis.apply {
+                    setDrawAxisLine(true)
+                    axisLineColor = axisColor
+                    axisLineWidth = 2f
+                    setDrawGridLines(false)
+                    this.textColor = textColor
+                }
+
+                val barData = BarData(stackedSet).apply { barWidth = 0.9f }
+                barChart.data = barData
+                barChart.setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
+                    override fun onValueSelected(e: Entry?, h: Highlight?) {
+                        if (e == null) return
+                        val monthIndex = e.x.toInt()
+                        findViewById<TextView>(R.id.textHintClickMonth).visibility = View.GONE
+                        showMonthDetails(monthIndex)
+                    }
+
+                    override fun onNothingSelected() {}
+                })
+                barChart.xAxis.axisMinimum = -0.5f
+                barChart.xAxis.axisMaximum = 11.5f
+                barChart.animateY(800)
+                barChart.invalidate()
+            } finally {
+                loadingOverlay.hide()
+            }
         }
     }
     private fun showMonthDetails(monthIndex: Int) {
         var selectedMonthBudget = 0.0
-        //ukryj poprzednie szczegóły
         textCategoryChartTitle.visibility = View.GONE
         categoryBarChart.visibility = View.GONE
         textPersonChartTitle.visibility = View.GONE
         personBarChart.visibility = View.GONE
+
         val month = monthIndex + 1
-        val months = listOf("Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
-            "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień")
+        val months = listOf(
+            "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+            "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+        )
+
+        loadingOverlay.show("Ładowanie szczegółów miesiąca...")
         lifecycleScope.launch {
-            val db = AppDatabase.Companion.getDatabase(this@StatisticsActivity)
-            val expenseDao = db.expenseDao()
-            val budgetDao = db.monthlyBudgetDao()
-            val start = getStartOfMonth(month)
-            val end = getEndOfMonth(month)
-            val expenses = withContext(Dispatchers.IO) {
-                expenseDao.getExpensesForUser(userId).filter { it.date in start..end }
-            }
-            val spent = expenses.sumOf { it.amount }
-            selectedMonthBudget = withContext(Dispatchers.IO) {
-                budgetDao.getBudgetForMonth(userId, selectedYear, month)?.budget ?: 0.0
-            }
-            val transactionsCount = expenses.size
-            val minExpense = expenses.minOfOrNull { it.amount } ?: 0.0
-            val maxExpense = expenses.maxOfOrNull { it.amount } ?: 0.0
-            textMonthTitle.text = "${months[monthIndex]} $selectedYear"
-            textMonthSpent.text = "Wydatki: ${MoneyFormatter.formatWithCurrency(spent)}"
-            textMonthBudget.text = "Budżet: ${MoneyFormatter.formatWithCurrency(selectedMonthBudget)}"
-            if (spent <= selectedMonthBudget) {
-                val saved = selectedMonthBudget - spent
-                textMonthResult.text = "Zaoszczędzono: ${MoneyFormatter.formatWithCurrency(saved)}"
-                textMonthResult.setTextColor(Color.parseColor("#2ECC71"))
-            } else {
-                val exceeded = spent - selectedMonthBudget
-                textMonthResult.text = "Przekroczono: ${MoneyFormatter.formatWithCurrency(exceeded)}"
-                textMonthResult.setTextColor(Color.parseColor("#E74C3C"))
-            }
-            textMonthCount.text = "Liczba transakcji: $transactionsCount"
-            textMonthMin.text = "Najmniejszy wydatek: ${MoneyFormatter.formatWithCurrency(minExpense)}"
-            textMonthMax.text = "Największy wydatek: ${MoneyFormatter.formatWithCurrency(maxExpense)}"
-            monthDetailsPanel.visibility = View.VISIBLE
-        }
-        buttonShowMonthDetails.setOnClickListener {
-            lifecycleScope.launch {
+            try {
                 val db = AppDatabase.Companion.getDatabase(this@StatisticsActivity)
                 val expenseDao = db.expenseDao()
+                val budgetDao = db.monthlyBudgetDao()
                 val start = getStartOfMonth(month)
                 val end = getEndOfMonth(month)
-                // Pobieranie sumy według kategorii
-                val categories = withContext(Dispatchers.IO) {
-                    expenseDao.getSumByCategoryForPeriod(userId, start, end)
-                }
-                // Pobieranie sumy według osób
-                val people = withContext(Dispatchers.IO) {
-                    expenseDao.getSumByPersonForPeriod(userId, start, end)
-                }
-                if (categories.isEmpty()) {
-                    Toast.makeText(this@StatisticsActivity, "Brak danych dla tego miesiąca", Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                // Tworzenie wykresu słupkowego dla kategorii
-                val entries = ArrayList<BarEntry>()
-                val labels = ArrayList<String>()
-                val colors = ArrayList<Int>()
-                // Pobierz kolory JEDEN raz zamiast w pętli
-                val settings = withContext(Dispatchers.IO) {
-                    db.settingsDao().getSettingsForUser(userId)
-                }
-                val colorMap = try {
-                    JSONObject(settings?.categoryColors ?: "{}")
-                } catch (e: Exception) {
-                    JSONObject()
+                val expenses = withContext(Dispatchers.IO) {
+                    expenseDao.getExpensesForUser(userId).filter { it.date in start..end }
                 }
 
-                categories.forEachIndexed { index, item ->
-                    val value = item.total ?: 0.0
-                    val categoryName = item.category ?: "Inne"
-                    entries.add(BarEntry(index.toFloat(), value.toFloat()))
-                    labels.add(categoryName)
-                    // Szybkie pobieranie koloru bez suspend
-                    val hex = colorMap.optString(categoryName, "#999999")
-                    colors.add(Color.parseColor(hex))
+                val spent = expenses.sumOf { it.amount }
+                selectedMonthBudget = withContext(Dispatchers.IO) {
+                    budgetDao.getBudgetForMonth(userId, selectedYear, month)?.budget ?: 0.0
                 }
-                val dataSet = BarDataSet(entries, "Kategorie").apply {
-                    this.colors = colors
-                    setDrawValues(false)
-                }
-                val barData = BarData(dataSet)
-                barData.barWidth = 0.6f
-                categoryBarChart.data = barData
-                textCategoryChartTitle.visibility = View.VISIBLE
-                categoryBarChart.visibility = View.VISIBLE
-                val isDark = resources.configuration.uiMode and
-                        Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-                val axisColor = if (isDark) Color.parseColor("#A88DFF") else Color.parseColor("#835BFF")
-                val gridColor = if (isDark) Color.parseColor("#444444") else Color.parseColor("#DDDDDD")
-                val textColor = if (isDark) Color.WHITE else Color.BLACK
-                categoryBarChart.xAxis.apply {
-                    valueFormatter = IndexAxisValueFormatter(labels)
-                    position = XAxis.XAxisPosition.BOTTOM
-                    granularity = 1f
-                    setDrawGridLines(false)
-                    setDrawAxisLine(true)
-                    axisLineColor = axisColor
-                    this.textColor = textColor
-                    textSize = 12f
-                }
-                val maxCategoryValue = categories.maxOf { it.total ?: 0.0 }
-                val dynamicStep = calculateDynamicStep(maxCategoryValue)
-                val roundedMax = (ceil(maxCategoryValue / dynamicStep) * dynamicStep).toFloat()
-                categoryBarChart.axisLeft.apply {
-                    axisMinimum = 0f
-                    axisMaximum = roundedMax
-                    granularity = dynamicStep
-                    setLabelCount((roundedMax / dynamicStep).toInt() + 1, true)
-                    setDrawAxisLine(true)
-                    axisLineColor = axisColor
-                    this.textColor = textColor
-                    setDrawGridLines(true)
-                    setGridColor(gridColor)
-                    gridLineWidth = 1f
-                }
-                categoryBarChart.axisRight.isEnabled = false
-                categoryBarChart.legend.isEnabled = false
-                categoryBarChart.description.isEnabled = false
-                categoryBarChart.invalidate()
+                val transactionsCount = expenses.size
+                val minExpense = expenses.minOfOrNull { it.amount } ?: 0.0
+                val maxExpense = expenses.maxOfOrNull { it.amount } ?: 0.0
 
-                // Tworzenie wykresu słupkowego dla osób
-                if (people.isNotEmpty()) {
-                    val personEntries = ArrayList<BarEntry>()
-                    val personLabels = ArrayList<String>()
-                    people.forEachIndexed { index, item ->
-                        val value = item.total
-                        val name = item.person ?: "Nieznane"
-                        personEntries.add(BarEntry(index.toFloat(), value.toFloat()))
-                        personLabels.add(name)
+                textMonthTitle.text = "Szczegóły: ${months[monthIndex]} $selectedYear"
+                textMonthSpent.text = "Wydatki: ${MoneyFormatter.formatWithCurrency(spent)}"
+                textMonthBudget.text = "Budżet: ${MoneyFormatter.formatWithCurrency(selectedMonthBudget)}"
+                if (spent <= selectedMonthBudget) {
+                    val saved = selectedMonthBudget - spent
+                    textMonthResult.text = "Zaoszczędzono: ${MoneyFormatter.formatWithCurrency(saved)}"
+                    textMonthResult.setTextColor(Color.parseColor("#2ECC71"))
+                } else {
+                    val exceeded = spent - selectedMonthBudget
+                    textMonthResult.text = "Przekroczono: ${MoneyFormatter.formatWithCurrency(exceeded)}"
+                    textMonthResult.setTextColor(Color.parseColor("#E74C3C"))
+                }
+                textMonthCount.text = "Liczba transakcji: $transactionsCount"
+                textMonthMin.text = "Najmniejszy wydatek: ${MoneyFormatter.formatWithCurrency(minExpense)}"
+                textMonthMax.text = "Największy wydatek: ${MoneyFormatter.formatWithCurrency(maxExpense)}"
+                monthDetailsPanel.visibility = View.VISIBLE
+            } finally {
+                loadingOverlay.hide()
+            }
+        }
+
+        buttonShowMonthDetails.setOnClickListener {
+            loadingOverlay.show("Ładowanie wykresów miesiąca...")
+            lifecycleScope.launch {
+                try {
+                    val db = AppDatabase.Companion.getDatabase(this@StatisticsActivity)
+                    val expenseDao = db.expenseDao()
+                    val start = getStartOfMonth(month)
+                    val end = getEndOfMonth(month)
+
+                    val categories = withContext(Dispatchers.IO) {
+                        expenseDao.getSumByCategoryForPeriod(userId, start, end)
                     }
-                    val dataSet = BarDataSet(personEntries, "Wydatki według osób").apply {
-                        color = Color.parseColor("#A88DFF")
-                        setDrawValues(false)
+                    val people = withContext(Dispatchers.IO) {
+                        expenseDao.getSumByPersonForPeriod(userId, start, end)
                     }
-                    val barData = BarData(dataSet)
-                    barData.barWidth = 0.7f
-                    personBarChart.data = barData
+
+                    if (categories.isEmpty()) {
+                        Toast.makeText(this@StatisticsActivity, "Brak danych dla tego miesiąca", Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
+
+                    val entries = ArrayList<BarEntry>()
+                    val labels = ArrayList<String>()
+                    val colors = ArrayList<Int>()
+                    val settings = withContext(Dispatchers.IO) {
+                        db.settingsDao().getSettingsForUser(userId)
+                    }
+                    val colorMap = try {
+                        JSONObject(settings?.categoryColors ?: "{}")
+                    } catch (e: Exception) {
+                        JSONObject()
+                    }
+
+                    categories.forEachIndexed { index, item ->
+                        val value = item.total ?: 0.0
+                        val categoryName = item.category ?: "Inne"
+                        entries.add(BarEntry(index.toFloat(), value.toFloat()))
+                        labels.add(categoryName)
+                        colors.add(Color.parseColor(colorMap.optString(categoryName, "#999999")))
+                    }
+
                     val isDark = resources.configuration.uiMode and
-                            Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                        Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
                     val axisColor = if (isDark) Color.parseColor("#A88DFF") else Color.parseColor("#835BFF")
                     val gridColor = if (isDark) Color.parseColor("#444444") else Color.parseColor("#DDDDDD")
                     val textColor = if (isDark) Color.WHITE else Color.BLACK
-                    personBarChart.xAxis.apply {
-                        valueFormatter = IndexAxisValueFormatter(personLabels)
+
+                    val categoryDataSet = BarDataSet(entries, "Kategorie").apply {
+                        this.colors = colors
+                        setDrawValues(false)
+                    }
+                    categoryBarChart.data = BarData(categoryDataSet).apply { barWidth = 0.6f }
+                    textCategoryChartTitle.visibility = View.VISIBLE
+                    categoryBarChart.visibility = View.VISIBLE
+                    categoryBarChart.xAxis.apply {
+                        valueFormatter = IndexAxisValueFormatter(labels)
                         position = XAxis.XAxisPosition.BOTTOM
                         granularity = 1f
                         setDrawGridLines(false)
@@ -459,14 +410,14 @@ class StatisticsActivity : AppCompatActivity() {
                         this.textColor = textColor
                         textSize = 12f
                     }
-                    val maxPersonValue = people.maxOf { it.total }
-                    val dynamicStep = calculateDynamicStep(maxPersonValue)
-                    val roundedMax = (ceil(maxPersonValue / dynamicStep) * dynamicStep).toFloat()
-                    personBarChart.axisLeft.apply {
+                    val maxCategoryValue = categories.maxOf { it.total ?: 0.0 }
+                    val categoryStep = calculateDynamicStep(maxCategoryValue)
+                    val categoryMax = (ceil(maxCategoryValue / categoryStep) * categoryStep).toFloat()
+                    categoryBarChart.axisLeft.apply {
                         axisMinimum = 0f
-                        axisMaximum = roundedMax
-                        granularity = dynamicStep
-                        setLabelCount((roundedMax / dynamicStep).toInt() + 1, true)
+                        axisMaximum = categoryMax
+                        granularity = categoryStep
+                        setLabelCount((categoryMax / categoryStep).toInt() + 1, true)
                         setDrawAxisLine(true)
                         axisLineColor = axisColor
                         this.textColor = textColor
@@ -474,22 +425,73 @@ class StatisticsActivity : AppCompatActivity() {
                         setGridColor(gridColor)
                         gridLineWidth = 1f
                     }
-                    personBarChart.axisRight.isEnabled = false
-                    personBarChart.legend.isEnabled = false
-                    personBarChart.description.isEnabled = false
-                    textPersonChartTitle.visibility = View.VISIBLE
-                    personBarChart.visibility = View.VISIBLE
-                    personBarChart.invalidate()
+                    categoryBarChart.axisRight.isEnabled = false
+                    categoryBarChart.legend.isEnabled = false
+                    categoryBarChart.description.isEnabled = false
+                    categoryBarChart.invalidate()
+
+                    if (people.isNotEmpty()) {
+                        val personEntries = ArrayList<BarEntry>()
+                        val personLabels = ArrayList<String>()
+                        people.forEachIndexed { index, item ->
+                            val value = item.total
+                            val name = item.person ?: "Nieznane"
+                            personEntries.add(BarEntry(index.toFloat(), value.toFloat()))
+                            personLabels.add(name)
+                        }
+
+                        val personDataSet = BarDataSet(personEntries, "Wydatki według osób").apply {
+                            color = Color.parseColor("#A88DFF")
+                            setDrawValues(false)
+                        }
+                        personBarChart.data = BarData(personDataSet).apply { barWidth = 0.7f }
+                        personBarChart.xAxis.apply {
+                            valueFormatter = IndexAxisValueFormatter(personLabels)
+                            position = XAxis.XAxisPosition.BOTTOM
+                            granularity = 1f
+                            setDrawGridLines(false)
+                            setDrawAxisLine(true)
+                            axisLineColor = axisColor
+                            this.textColor = textColor
+                            textSize = 12f
+                        }
+                        val maxPersonValue = people.maxOf { it.total }
+                        val personStep = calculateDynamicStep(maxPersonValue)
+                        val personMax = (ceil(maxPersonValue / personStep) * personStep).toFloat()
+                        personBarChart.axisLeft.apply {
+                            axisMinimum = 0f
+                            axisMaximum = personMax
+                            granularity = personStep
+                            setLabelCount((personMax / personStep).toInt() + 1, true)
+                            setDrawAxisLine(true)
+                            axisLineColor = axisColor
+                            this.textColor = textColor
+                            setDrawGridLines(true)
+                            setGridColor(gridColor)
+                            gridLineWidth = 1f
+                        }
+                        personBarChart.axisRight.isEnabled = false
+                        personBarChart.legend.isEnabled = false
+                        personBarChart.description.isEnabled = false
+                        textPersonChartTitle.visibility = View.VISIBLE
+                        personBarChart.visibility = View.VISIBLE
+                        personBarChart.invalidate()
+                    } else {
+                        textPersonChartTitle.visibility = View.GONE
+                        personBarChart.visibility = View.GONE
+                    }
+                } finally {
+                    loadingOverlay.hide()
                 }
             }
         }
     }
     private fun calculateDynamicStep(maxValue: Double): Float {
         return when {
-            maxValue <= 100 -> 20f //małe wartości
-            maxValue <= 400 -> 100f //średnie wartości
-            maxValue <= 2000 -> 200f // większe wartości
-            else -> 500f // bardzo duże wartości - jak dotychczas
+            maxValue <= 100 -> 20f //maĹ‚e wartoĹ›ci
+            maxValue <= 400 -> 100f //Ĺ›rednie wartoĹ›ci
+            maxValue <= 2000 -> 200f // wiÄ™ksze wartoĹ›ci
+            else -> 500f // bardzo duĹĽe wartoĹ›ci - jak dotychczas
         }
     }
 
@@ -521,3 +523,4 @@ class StatisticsActivity : AppCompatActivity() {
         }
     }
 }
+

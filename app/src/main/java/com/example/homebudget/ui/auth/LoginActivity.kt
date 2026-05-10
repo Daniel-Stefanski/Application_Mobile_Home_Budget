@@ -8,7 +8,9 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -25,6 +27,7 @@ import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.User
 import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.notifications.NotificationHelper
+import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.ThemeHelper
@@ -45,6 +48,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var textLoginError: TextView
     private lateinit var checkBoxRememberMe: CheckBox
     private lateinit var checkBoxShowPassword: CheckBox
+    private lateinit var loadingDialog: LoadingDialogController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
@@ -69,6 +73,7 @@ class LoginActivity : AppCompatActivity() {
         }
 
         setContentView(R.layout.activity_login)
+        loadingDialog = LoadingDialogController(this)
 
         userDao = AppDatabase.getDatabase(this).userDao()
 
@@ -80,6 +85,19 @@ class LoginActivity : AppCompatActivity() {
         textLoginError = findViewById(R.id.textLoginError)
         checkBoxRememberMe = findViewById(R.id.checkBoxRememberMe)
         checkBoxShowPassword = findViewById(R.id.checkboxShowPassword)
+
+        val clearLoginErrorWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+
+            override fun afterTextChanged(s: Editable?) {
+                if (textLoginError.visibility == View.VISIBLE) {
+                    resetLoginErrorState()
+                }
+            }
+        }
+        editTextEmail.addTextChangedListener(clearLoginErrorWatcher)
+        editTextPassword.addTextChangedListener(clearLoginErrorWatcher)
 
         checkBoxShowPassword.setOnCheckedChangeListener { _, isChecked ->
             editTextPassword.inputType = if (isChecked) {
@@ -102,63 +120,70 @@ class LoginActivity : AppCompatActivity() {
         }
 
         buttonLogin.setOnClickListener {
-            textLoginError.visibility = View.GONE
+            resetLoginErrorState()
             val email = editTextEmail.text.toString().trim().lowercase()
             val password = editTextPassword.text.toString()
+            buttonLogin.isEnabled = false
+            loadingDialog.show("Logowanie...")
 
             lifecycleScope.launch {
-                val localUser = withContext(Dispatchers.IO) {
-                    userDao.getUserByUsername(email)
-                }
-                val offlineMode = !isNetworkAvailable()
+                try {
+                    val localUser = withContext(Dispatchers.IO) {
+                        userDao.getUserByUsername(email)
+                    }
+                    val offlineMode = !isNetworkAvailable()
 
-                val result = AuthRepository.signIn(email, password)
-                if (result.isFailure) {
-                    if (offlineMode && localUser?.password == password) {
-                        finishLogin(localUser.id, checkBoxRememberMe.isChecked, offline = true)
+                    val result = AuthRepository.signIn(email, password)
+                    if (result.isFailure) {
+                        if (offlineMode && localUser?.password == password) {
+                            finishLogin(localUser.id, checkBoxRememberMe.isChecked, offline = true)
+                            return@launch
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            showLoginErrorState()
+                            Toast.makeText(
+                                this@LoginActivity,
+                                if (offlineMode) {
+                                    "Brak internetu i brak poprawnych danych lokalnych do logowania"
+                                } else {
+                                    "Nieprawidlowy email lub haslo"
+                                },
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                         return@launch
                     }
 
-                    withContext(Dispatchers.Main) {
-                        textLoginError.visibility = View.VISIBLE
-                        Toast.makeText(
-                            this@LoginActivity,
-                            if (offlineMode) {
-                                "Brak internetu i brak poprawnych danych lokalnych do logowania"
-                            } else {
-                                "Nieprawidlowy email lub haslo"
-                            },
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    val supabaseUser = result.getOrThrow()
+                    Prefs.setSupabaseUid(this@LoginActivity, supabaseUser.id)
+                    WorkSchedulerSupabase.scheduleSupabaseSync(this@LoginActivity)
+
+                    val userId = if (localUser == null) {
+                        val now = System.currentTimeMillis()
+                        val newUser = User(
+                            username = email,
+                            password = password,
+                            name = "",
+                            createdAt = now,
+                            lastLogin = now
+                        )
+                        withContext(Dispatchers.IO) {
+                            userDao.insertUser(newUser).toInt()
+                        }
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            userDao.updatePassword(email, password)
+                            userDao.updateLastLogin(localUser.id, System.currentTimeMillis())
+                        }
+                        localUser.id
                     }
-                    return@launch
+
+                    finishLogin(userId, checkBoxRememberMe.isChecked, offline = false)
+                } finally {
+                    loadingDialog.hide()
+                    buttonLogin.isEnabled = true
                 }
-
-                val supabaseUser = result.getOrThrow()
-                Prefs.setSupabaseUid(this@LoginActivity, supabaseUser.id)
-                WorkSchedulerSupabase.scheduleSupabaseSync(this@LoginActivity)
-
-                val userId = if (localUser == null) {
-                    val now = System.currentTimeMillis()
-                    val newUser = User(
-                        username = email,
-                        password = password,
-                        name = "",
-                        createdAt = now,
-                        lastLogin = now
-                    )
-                    withContext(Dispatchers.IO) {
-                        userDao.insertUser(newUser).toInt()
-                    }
-                } else {
-                    withContext(Dispatchers.IO) {
-                        userDao.updatePassword(email, password)
-                        userDao.updateLastLogin(localUser.id, System.currentTimeMillis())
-                    }
-                    localUser.id
-                }
-
-                finishLogin(userId, checkBoxRememberMe.isChecked, offline = false)
             }
         }
     }
@@ -209,5 +234,17 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
+    }
+
+    private fun showLoginErrorState() {
+        textLoginError.visibility = View.VISIBLE
+        editTextEmail.setBackgroundResource(R.drawable.shape_search_border_error)
+        editTextPassword.setBackgroundResource(R.drawable.shape_search_border_error)
+    }
+
+    private fun resetLoginErrorState() {
+        textLoginError.visibility = View.GONE
+        editTextEmail.setBackgroundResource(R.drawable.shape_search_border)
+        editTextPassword.setBackgroundResource(R.drawable.shape_search_border)
     }
 }

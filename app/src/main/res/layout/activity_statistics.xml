@@ -58,27 +58,59 @@
         </LinearLayout>
 
         <!--Kafel podsumowania roku-->
-        <TextView
-            android:id="@+id/textYearTotal"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/yearSummaryCard"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp"/>
-        <TextView
-            android:id="@+id/textYearBudget"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="4dp"/>
-        <TextView
-            android:id="@+id/textYearSavings"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="4dp"/>
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/bg_summary_card"
+            android:elevation="4dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/textYearSummaryHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Podsumowanie roczne:"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/textYearTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary" />
+
+            <TextView
+                android:id="@+id/textYearBudget"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary" />
+
+            <TextView
+                android:id="@+id/textYearSavings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!--Wykres słupkowy-->
+        <com.github.mikephil.charting.charts.BarChart
+            android:id="@+id/barChartStats"
+            android:layout_width="match_parent"
+            android:layout_height="350dp"
+            android:layout_marginBottom="12dp"/>
 
         <!--Informacja o kliknięciu w miesiac-->
         <TextView
@@ -89,15 +121,81 @@
             android:textSize="13sp"
             android:textColor="#888888"
             android:gravity="center"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:padding="4dp"/>
 
-        <!--Wykres słupkowy-->
-        <com.github.mikephil.charting.charts.BarChart
-            android:id="@+id/barChartStats"
+        <!--Legenda pod wykresem-->
+        <LinearLayout
+            android:id="@+id/yearChartLegend"
             android:layout_width="match_parent"
-            android:layout_height="350dp"
-            android:layout_marginBottom="12dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="#3498DB" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wydatki"
+                    android:textColor="?android:textColorPrimary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="#2ECC71" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Budżet"
+                    android:textColor="?android:textColorPrimary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="#E74C3C" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Przekroczenie"
+                    android:textColor="?android:textColorPrimary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
 
         <!--Panel rozwijany dla szczegółów miesiąca-->
         <LinearLayout

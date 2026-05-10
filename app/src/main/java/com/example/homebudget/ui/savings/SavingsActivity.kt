@@ -1,10 +1,15 @@
-package com.example.homebudget.ui.savings
+﻿package com.example.homebudget.ui.savings
 
 import android.app.AlertDialog
+import android.app.AlarmManager
 import android.app.DatePickerDialog
 import android.content.Intent
+import android.graphics.Typeface
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.ArrayAdapter
@@ -12,6 +17,7 @@ import android.widget.EditText
 import android.widget.Toast
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.text.InputFilter
@@ -29,6 +35,8 @@ import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.SavingsGoalAlarmScheduler
 import com.example.homebudget.notifications.NotificationHelper
+import com.example.homebudget.ui.common.loading.LoadingDialogController
+import com.example.homebudget.ui.common.loading.LoadingOverlayController
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.money.MoneyFormatter
@@ -47,18 +55,22 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.math.abs
 
-//SavingsActivity.kt – ekran zarządzania oszczędnościami użytkownika.
+//SavingsActivity.kt â€“ ekran zarzÄ…dzania oszczÄ™dnoĹ›ciami uĹĽytkownika.
 class SavingsActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptySaving: TextView
     private lateinit var adapter: SavingsGoalAdapter
+    private lateinit var loadingOverlay: LoadingOverlayController
+    private lateinit var loadingDialog: LoadingDialogController
     private var userId: Int = -1
-    private var selectedEndDate: Long? = null  // <- wybrana data zakończenia
+    private var selectedEndDate: Long? = null  // <- wybrana data zakoĹ„czenia
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_savings)
+        loadingOverlay = LoadingOverlayController(this)
+        loadingDialog = LoadingDialogController(this)
 
         recyclerView = findViewById(R.id.recyclerGoals)
         emptySaving = findViewById(R.id.textEmptySaving)
@@ -69,54 +81,64 @@ class SavingsActivity : AppCompatActivity() {
             onWithdrawClick = { goal -> showWithdrawDialog(goal) },
             onDeleteClick = { goal -> deleteGoal(goal) },
             onEditClick = { goal -> showEditGoalDialog(goal) },
-            onViewContributionsClick = { goal -> showContributionsDialog(goal) }
+            onViewContributionsClick = { goal -> showContributionsDialogModern(goal) }
         )
         recyclerView.adapter = adapter
 
         // Pobranie userId z Intentu
         userId = Prefs.getUserId(this)
         if (userId == -1) {
-            Toast.makeText(this, "Błąd: brak użytkownika", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "BĹ‚Ä…d: brak uĹĽytkownika", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
-        // Załadowanie listy
+        // ZaĹ‚adowanie listy
         loadGoals()
 
-        // Obsługa przycisku dodawania
+        // ObsĹ‚uga przycisku dodawania
         findViewById<Button>(R.id.buttonAddGoal).setOnClickListener {
             showAddGoalDialog()
         }
 
-        // Obsługa przycisku powrotu do ekranu głównego
+        // ObsĹ‚uga przycisku powrotu do ekranu gĹ‚Ăłwnego
         findViewById<Button>(R.id.buttonBackToMain).setOnClickListener {
-            val intent = Intent(this, DashboardActivity::class.java) // Odwołanie gdzie wraca do wskazanego ekranu
+            val intent = Intent(this, DashboardActivity::class.java) // OdwoĹ‚anie gdzie wraca do wskazanego ekranu
             startActivity(intent)
             finish()
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        rescheduleSavingsGoalReminders()
+    }
+
     private fun loadGoals() {
         val db = AppDatabase.getDatabase(this)
+        loadingOverlay.show("Ładowanie celów...")
         lifecycleScope.launch {
-            val goals = withContext(Dispatchers.IO) {
-                db.savingsGoalDao().getGoalsForUser(userId)
-            }
-            if (goals.isEmpty()) {
-                recyclerView.visibility = View.GONE
-                emptySaving.visibility = View.VISIBLE
-            } else {
-                recyclerView.visibility = View.VISIBLE
-                emptySaving.visibility = View.GONE
-            }
+            try {
+                val goals = withContext(Dispatchers.IO) {
+                    db.savingsGoalDao().getGoalsForUser(userId)
+                }
+                if (goals.isEmpty()) {
+                    recyclerView.visibility = View.GONE
+                    emptySaving.visibility = View.VISIBLE
+                } else {
+                    recyclerView.visibility = View.VISIBLE
+                    emptySaving.visibility = View.GONE
+                }
 
-            //Sortowanie-aktywne cele(niespełnione) u góry
-            val sortedGoals = goals.sortedWith(
-                compareBy<SavingsGoal> { it.savedAmount >= it.targetAmount } //false -> aktywny, true -> zakończony
-                        .thenBy { it.endDate ?: Long.MAX_VALUE }
-            ) //sortuj wg daty, jeśli jest
-            adapter.updateData(sortedGoals)
+                //Sortowanie-aktywne cele(niespeĹ‚nione) u gĂłry
+                val sortedGoals = goals.sortedWith(
+                    compareBy<SavingsGoal> { it.savedAmount >= it.targetAmount } //false -> aktywny, true -> zakoĹ„czony
+                            .thenBy { it.endDate ?: Long.MAX_VALUE }
+                ) //sortuj wg daty, jeĹ›li jest
+                adapter.updateData(sortedGoals)
+            } finally {
+                loadingOverlay.hide()
+            }
         }
     }
 
@@ -165,7 +187,7 @@ class SavingsActivity : AppCompatActivity() {
 
                 if (text.isBlank()) {
                     editText.setBackgroundResource(errorBorder)
-                    editText.error = "Podaj prawidłową kwotę"
+                    editText.error = "Podaj prawidĹ‚owÄ… kwotÄ™"
                     return@setOnFocusChangeListener
                 }
 
@@ -189,7 +211,7 @@ class SavingsActivity : AppCompatActivity() {
                     editText.error = null
                 } else {
                     editText.setBackgroundResource(errorBorder)
-                    editText.error = "Podaj prawidłową kwotę"
+                    editText.error = "Podaj prawidĹ‚owÄ… kwotÄ™"
                 }
             } else {
                 editText.setBackgroundResource(normalBorder)
@@ -197,7 +219,7 @@ class SavingsActivity : AppCompatActivity() {
         }
     }
 
-    // ---------------------- DODAWANIE CELU Z DATĄ ----------------------
+    // ---------------------- DODAWANIE CELU Z DATÄ„ ----------------------
     private fun showAddGoalDialog() {
         selectedEndDate = null
         val layout = LinearLayout(this)
@@ -233,7 +255,7 @@ class SavingsActivity : AppCompatActivity() {
             }
         }
 
-        // 🔽 Lista osób z ustawień (multi-choice)
+        // đź”˝ Lista osĂłb z ustawieĹ„ (multi-choice)
         val buttonSelectPeople = Button(this)
         buttonSelectPeople.text = "Wybierz osoby (opcjonalnie)"
         layout.addView(buttonSelectPeople)
@@ -284,13 +306,13 @@ class SavingsActivity : AppCompatActivity() {
 
         // Przycisk wyboru daty
         val buttonPickDate = Button(this)
-        buttonPickDate.text = "Wybierz datę zakończenia (opcjonalnie)"
+        buttonPickDate.text = "Wybierz datÄ™ zakoĹ„czenia (opcjonalnie)"
         layout.addView(buttonPickDate)
 
         buttonPickDate.setOnClickListener {
             showDatePicker { timestamp, formatted ->
                 selectedEndDate = timestamp
-                buttonPickDate.text = "Data zakończenia: $formatted"
+                buttonPickDate.text = "Data zakoĹ„czenia: $formatted"
             }
         }
 
@@ -301,7 +323,7 @@ class SavingsActivity : AppCompatActivity() {
                 val title = inputTitle.text.toString()
                 val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
                 if (title.isNotBlank() && amount != null && amount > 0) {
-                    lifecycleScope.launch {
+                    launchBlockingAction("Zapisywanie celu...") {
                         val db = AppDatabase.getDatabase(this@SavingsActivity)
                         val goal = SavingsGoal(
                             userId = userId,
@@ -385,24 +407,24 @@ class SavingsActivity : AppCompatActivity() {
         layout.addView(inputAmount)
         setupMoneyInput(inputAmount)
 
-        // 🔽 Przycisk do wyboru osób (zamiast spinnera)
+        // đź”˝ Przycisk do wyboru osĂłb (zamiast spinnera)
         val buttonSelectPeople = Button(this)
         layout.addView(buttonSelectPeople)
 
-        //Lista osób już wybranych
+        //Lista osĂłb juĹĽ wybranych
         val selectedPeople = mutableSetOf<String>()
         if (!goal.sharedWith.isNullOrBlank()) {
             selectedPeople.addAll(goal.sharedWith.split(",").map { it.trim() })
         }
 
-        //Ustaw wstępny tekst przycisku
+        //Ustaw wstÄ™pny tekst przycisku
         buttonSelectPeople.text = if (selectedPeople.isEmpty()) {
             "Wybierz osoby (opcjonalnie)"
         } else {
             "Wybrano: ${selectedPeople.joinToString(", ")}"
         }
 
-        //Wczytaj osoby z ustawień
+        //Wczytaj osoby z ustawieĹ„
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(this@SavingsActivity)
             val settings = withContext(Dispatchers.IO) {
@@ -461,26 +483,26 @@ class SavingsActivity : AppCompatActivity() {
         var endDate: Long? = goal.endDate
         if (goal.endDate != null) {
             val cal = Calendar.getInstance().apply { timeInMillis = goal.endDate }
-            buttonPickDate.text = "Data zakończenia: ${cal.get(Calendar.DAY_OF_MONTH)}.${cal.get(Calendar.MONTH) + 1}.${cal.get(Calendar.YEAR)}"
+            buttonPickDate.text = "Data zakoĹ„czenia: ${cal.get(Calendar.DAY_OF_MONTH)}.${cal.get(Calendar.MONTH) + 1}.${cal.get(Calendar.YEAR)}"
         } else {
-            buttonPickDate.text = "Wybierz datę zakończenia (opcjonalnie)"
+            buttonPickDate.text = "Wybierz datÄ™ zakoĹ„czenia (opcjonalnie)"
         }
         layout.addView(buttonPickDate)
 
         buttonPickDate.setOnClickListener {
             showDatePicker { timestamp, formatted ->
                 endDate = timestamp
-                buttonPickDate.text = "Data zakończenia: $formatted"
+                buttonPickDate.text = "Data zakoĹ„czenia: $formatted"
             }
         }
         val buttonRemoveDate = Button(this).apply {
-            text = "❌ Usuń termin"
+            text = "âťŚ UsuĹ„ termin"
             visibility = if (goal.endDate != null) View.VISIBLE else View.GONE
         }
         layout.addView(buttonRemoveDate)
         buttonRemoveDate.setOnClickListener {
             endDate = null
-            buttonPickDate.text = "Wybierz datę zakończenia (opcjonalnie)"
+            buttonPickDate.text = "Wybierz datÄ™ zakoĹ„czenia (opcjonalnie)"
             buttonRemoveDate.visibility = View.GONE
         }
 
@@ -492,7 +514,7 @@ class SavingsActivity : AppCompatActivity() {
                 val newAmount = MoneyUtils.parseAmount(inputAmount.text.toString())
                 if (newTitle.isNotBlank() && newAmount != null && newAmount > 0) {
                     val db = AppDatabase.getDatabase(this)
-                    lifecycleScope.launch {
+                    launchBlockingAction("Aktualizowanie celu...") {
                         val updateGoal = goal.copy(
                                 title = newTitle,
                                 targetAmount = newAmount,
@@ -550,9 +572,9 @@ class SavingsActivity : AppCompatActivity() {
                                 WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
                             }
                         }
-                        // Najpierw wyczyść stare
+                        // Najpierw wyczyĹ›Ä‡ stare
                         SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, updateGoal.id)
-                        // Jeśli jest endDate i cel nie osiągnięty -> ustaw nowe
+                        // JeĹ›li jest endDate i cel nie osiÄ…gniÄ™ty -> ustaw nowe
                         if (Prefs.isNotificationsEnabled(this@SavingsActivity)) {
                             SavingsGoalAlarmScheduler.scheduleAllRemindersForGoal(this@SavingsActivity, updateGoal)
                         }
@@ -568,13 +590,13 @@ class SavingsActivity : AppCompatActivity() {
 
     // Dodawanie kwoty
     private fun showAddAmountDialog(goal: SavingsGoal) {
-        // 🧱 Tworzymy layout do dialogu
+        // đź§± Tworzymy layout do dialogu
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(50, 40, 50, 10)
         }
 
-        // 🧾 Pole kwoty
+        // đź§ľ Pole kwoty
         val inputAmount = EditText(this).apply {
             hint = "Kwota do dodania"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
@@ -582,15 +604,15 @@ class SavingsActivity : AppCompatActivity() {
         layout.addView(inputAmount)
         setupMoneyInput(inputAmount)
 
-        // 👥 Spinner – kto wpłaca
+        // đź‘Ą Spinner â€“ kto wpĹ‚aca
         val spinner = Spinner(this)
         layout.addView(spinner)
 
-        //Załaduj listę osób związane z tym celem
+        //ZaĹ‚aduj listÄ™ osĂłb zwiÄ…zane z tym celem
         lifecycleScope.launch {
             val peopleList = mutableListOf("Tylko ja")
 
-            //Jeśli cel jest współdzielony
+            //JeĹ›li cel jest wspĂłĹ‚dzielony
             if (!goal.sharedWith.isNullOrBlank()) {
                 val sharedPeople = goal.sharedWith.split(",").map { it.trim() }
                 peopleList.addAll(sharedPeople)
@@ -606,9 +628,9 @@ class SavingsActivity : AppCompatActivity() {
             }
         }
 
-        // 🪟 Budujemy dialog
+        // đźŞź Budujemy dialog
         AlertDialog.Builder(this)
-            .setTitle("Dodaj oszczędności")
+            .setTitle("Dodaj oszczÄ™dnoĹ›ci")
             .setView(layout)
             .setPositiveButton("Dodaj") { _, _ ->
                 val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
@@ -616,23 +638,23 @@ class SavingsActivity : AppCompatActivity() {
 
                 if (amount != null && amount > 0) {
                     val db = AppDatabase.getDatabase(this)
-                    lifecycleScope.launch {
-                        // Ile było przed?
+                    launchBlockingAction("Zapisywanie wpłaty...") {
+                        // Ile byĹ‚o przed?
                         val before = goal.savedAmount
                         // Ile po dodaniu?
                         val after = before + amount
-                        // Czy właśnie osiagnelismy 100%
+                        // Czy wĹ‚aĹ›nie osiagnelismy 100%
                         val reachedNow = before < goal.targetAmount && after >= goal.targetAmount
-                        // Czy powiadomienie może zostać wysłane?
+                        // Czy powiadomienie moĹĽe zostaÄ‡ wysĹ‚ane?
                         val shouldSendNotification = reachedNow && !goal.notificationCompletedSent
                         //Zaktualizuj kwote w SavingGoal
                         val updatedGoal = goal.copy(savedAmount = after, notificationCompletedSent = goal.notificationCompletedSent || reachedNow)
-                        // Jeśli cel osiągnięto Teraz -> wyślik powiadomienie systemowe
+                        // JeĹ›li cel osiÄ…gniÄ™to Teraz -> wyĹ›lik powiadomienie systemowe
                         if (shouldSendNotification && Prefs.isNotificationsEnabled(this@SavingsActivity)) {
-                            // Anuluj istniejące przypomnienia, nie maja sensu gdy cel zrobiony
+                            // Anuluj istniejÄ…ce przypomnienia, nie maja sensu gdy cel zrobiony
                             SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, goal.id)
-                            val title = "Cel osiągnięty!"
-                            val text = "Gratulacje! „${goal.title}” został w 100% zrealizowany. Cel: ${MoneyFormatter.formatWithCurrency(goal.targetAmount)} 🎉"
+                            val title = "Cel osiÄ…gniÄ™ty!"
+                            val text = "Gratulacje! â€ž${goal.title}â€ť zostaĹ‚ w 100% zrealizowany. Cel: ${MoneyFormatter.formatWithCurrency(goal.targetAmount)} đźŽ‰"
                             // Systemowe powiadomeinia
                             NotificationHelper.notifySavings(this@SavingsActivity, updatedGoal.id * 10000 + 999 /*unikalne ID*/, title, text)
                         }
@@ -725,38 +747,38 @@ class SavingsActivity : AppCompatActivity() {
                                 WorkSchedulerSupabase.scheduleSupabaseSync(this@SavingsActivity)
                             }
                         }
-                        //Odśwież listę celów
+                        //OdĹ›wieĹĽ listÄ™ celĂłw
                         loadGoals()
                     }
                 } else {
-                    Toast.makeText(this, "Podaj poprawną kwotę", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Podaj poprawnÄ… kwotÄ™", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Anuluj", null)
             .show()
     }
-    // Wypłacanie kwoty
+    // WypĹ‚acanie kwoty
     private fun showWithdrawDialog(goal: SavingsGoal) {
-        // 🧱 Tworzymy layout do dialogu
+        // đź§± Tworzymy layout do dialogu
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(50, 40, 50, 10)
         }
-        // 🧾 Pole kwoty
+        // đź§ľ Pole kwoty
         val inputAmount = EditText(this).apply {
-            hint = "Kwota do wypłaty"
+            hint = "Kwota do wypĹ‚aty"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
         layout.addView(inputAmount)
         setupMoneyInput(inputAmount)
 
-        // 👥 Spinner – kto wpłaca
+        // đź‘Ą Spinner â€“ kto wpĹ‚aca
         val spinner = Spinner(this)
         layout.addView(spinner)
-        //Załaduj listę osób związane z tym celem
+        //ZaĹ‚aduj listÄ™ osĂłb zwiÄ…zane z tym celem
         lifecycleScope.launch {
             val peopleList = mutableListOf("Tylko ja")
-            //Jeśli cel jest współdzielony
+            //JeĹ›li cel jest wspĂłĹ‚dzielony
             if (!goal.sharedWith.isNullOrBlank()) {
                 val sharedPeople = goal.sharedWith.split(",").map { it.trim() }
                 peopleList.addAll(sharedPeople)
@@ -771,32 +793,32 @@ class SavingsActivity : AppCompatActivity() {
                 spinner.adapter = adapterSpinner
             }
         }
-        // 🪟 Budujemy dialog
+        // đźŞź Budujemy dialog
         AlertDialog.Builder(this)
-            .setTitle("Wypłać środki")
+            .setTitle("WypĹ‚aÄ‡ Ĺ›rodki")
             .setView(layout)
-            .setPositiveButton("Wypłać") { _, _ ->
+            .setPositiveButton("WypĹ‚aÄ‡") { _, _ ->
                 val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
                 val selectedPerson = spinner.selectedItem.toString()
                 if (amount == null || amount <= 0) {
                     AlertDialog.Builder(this)
                         .setTitle("Niepoprawna kwota")
-                        .setMessage("Podaj kwotę większą od zera.")
+                        .setMessage("Podaj kwotÄ™ wiÄ™kszÄ… od zera.")
                         .setPositiveButton("OK", null)
                         .show()
                     return@setPositiveButton
                 }
                 if (amount > goal.savedAmount) {
                     AlertDialog.Builder(this)
-                        .setTitle("Brak środków")
-                        .setMessage("Nie możesz wypłacić $amount zł. \n\n" +
-                                "Dostępne środki: ${MoneyFormatter.formatWithCurrency(goal.savedAmount)}")
+                        .setTitle("Brak Ĺ›rodkĂłw")
+                        .setMessage("Nie moĹĽesz wypĹ‚aciÄ‡ $amount zĹ‚. \n\n" +
+                                "DostÄ™pne Ĺ›rodki: ${MoneyFormatter.formatWithCurrency(goal.savedAmount)}")
                         .setPositiveButton("OK", null)
                         .show()
-                    Toast.makeText(this,"Podaj poprawną kwotę", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this,"Podaj poprawnÄ… kwotÄ™", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                lifecycleScope.launch {
+                launchBlockingAction("Zapisywanie wypłaty...") {
                     val db = AppDatabase.getDatabase(this@SavingsActivity)
                     val updatedGoal = goal.copy(savedAmount = goal.savedAmount - amount)
 
@@ -896,7 +918,34 @@ class SavingsActivity : AppCompatActivity() {
             .show()
     }
 
-    // Sprawdzanie historii wpłat do danego celu
+    // Sprawdzanie historii wpĹ‚at do danego celu
+    private fun rescheduleSavingsGoalReminders() {
+        if (userId == -1 || !Prefs.isNotificationsEnabled(this)) return
+
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(this@SavingsActivity)
+            val goals = withContext(Dispatchers.IO) {
+                db.savingsGoalDao().getGoalsForUser(userId)
+            }
+
+            goals.forEach { goal ->
+                SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, goal.id)
+                SavingsGoalAlarmScheduler.scheduleAllRemindersForGoal(this@SavingsActivity, goal)
+            }
+        }
+    }
+
+    private fun launchBlockingAction(message: String, block: suspend () -> Unit) {
+        loadingDialog.show(message)
+        lifecycleScope.launch {
+            try {
+                block()
+            } finally {
+                loadingDialog.hide()
+            }
+        }
+    }
+
     private fun showContributionsDialog(goal: SavingsGoal) {
         val db = AppDatabase.getDatabase(this)
         lifecycleScope.launch {
@@ -906,13 +955,13 @@ class SavingsActivity : AppCompatActivity() {
             val grouped = contributions.groupBy { it.personName }
             val summary = grouped.entries.joinToString("\n") { (person, list) ->
                 val sum = list.sumOf { it.amount }
-                "• $person: ${MoneyFormatter.formatWithCurrency(abs(sum))}"
+                "â€˘ $person: ${MoneyFormatter.formatWithCurrency(abs(sum))}"
             }
             runOnUiThread {
                 if (contributions.isEmpty()) {
                     AlertDialog.Builder(this@SavingsActivity)
-                        .setTitle("Historia wpłat")
-                        .setMessage("Brak wpłat dla tego celu.")
+                        .setTitle("Historia wpĹ‚at")
+                        .setMessage("Brak wpĹ‚at dla tego celu.")
                         .setPositiveButton("OK", null)
                         .show()
                 } else {
@@ -928,7 +977,7 @@ class SavingsActivity : AppCompatActivity() {
                     }
                     // Podsumowanie
                     val summaryTitle = TextView(this@SavingsActivity).apply {
-                        text = "📊 PODSUMOWANIE:"
+                        text = "đź“Š PODSUMOWANIE:"
                         textSize = 15f
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -956,7 +1005,7 @@ class SavingsActivity : AppCompatActivity() {
                     }
                     // Separator
                     val separator = TextView(this@SavingsActivity).apply {
-                        text = "──────────────"
+                        text = "â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€"
                         setTextColor(getColor(android.R.color.darker_gray))
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -964,7 +1013,7 @@ class SavingsActivity : AppCompatActivity() {
                     }
                     // Historia
                     val historyTitle = TextView(this@SavingsActivity).apply {
-                        text = "📜 HISTORIA:"
+                        text = "đź“ś HISTORIA:"
                         textSize = 15f
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -996,7 +1045,7 @@ class SavingsActivity : AppCompatActivity() {
                     container.addView(historyTitle)
                     container.addView(historyText)
                     AlertDialog.Builder(this@SavingsActivity)
-                        .setTitle("Historia wpłat - ${goal.title}")
+                        .setTitle("Historia wpĹ‚at - ${goal.title}")
                         .setView(container)
                         .setPositiveButton("OK", null)
                         .show()
@@ -1005,16 +1054,132 @@ class SavingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun showContributionsDialogModern(goal: SavingsGoal) {
+        val db = AppDatabase.getDatabase(this)
+        lifecycleScope.launch {
+            val contributions = withContext(Dispatchers.IO) {
+                db.contributionDao().getContributionsForGoal(goal.id)
+            }
+
+            runOnUiThread {
+                if (contributions.isEmpty()) {
+                    AlertDialog.Builder(this@SavingsActivity)
+                        .setTitle("Historia wpĹ‚at")
+                        .setMessage("Brak wpĹ‚at dla tego celu.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                    return@runOnUiThread
+                }
+
+                val grouped = contributions.groupBy { it.personName }
+                val textColor = MaterialColors.getColor(
+                    this@SavingsActivity,
+                    android.R.attr.textColorPrimary,
+                    getColor(android.R.color.black)
+                )
+                val positiveColor = MaterialColors.getColor(
+                    this@SavingsActivity,
+                    com.google.android.material.R.attr.colorPrimary,
+                    getColor(android.R.color.holo_blue_dark)
+                )
+                val negativeColor = MaterialColors.getColor(
+                    this@SavingsActivity,
+                    com.google.android.material.R.attr.colorError,
+                    getColor(android.R.color.holo_red_dark)
+                )
+                val density = resources.displayMetrics.density
+                fun Int.dp(): Int = (this * density).toInt()
+
+                val scrollView = ScrollView(this@SavingsActivity).apply {
+                    isFillViewport = true
+                }
+                val container = LinearLayout(this@SavingsActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(24.dp(), 12.dp(), 24.dp(), 12.dp())
+                }
+                scrollView.addView(container)
+
+                val summaryTitle = TextView(this@SavingsActivity).apply {
+                    text = "Podsumowanie:"
+                    textSize = 16f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(textColor)
+                    setPadding(0, 0, 0, 8.dp())
+                }
+                container.addView(summaryTitle)
+
+                grouped.forEach { (person, list) ->
+                    val sum = list.sumOf { it.amount }
+                    val sign = if (sum >= 0) "+" else "-"
+                    val summaryRow = TextView(this@SavingsActivity).apply {
+                        text = "$person: $sign${MoneyFormatter.formatWithCurrency(abs(sum))}"
+                        textSize = 14f
+                        typeface = Typeface.DEFAULT_BOLD
+                        setTextColor(if (sum < 0) negativeColor else textColor)
+                        setPadding(0, 0, 0, 6.dp())
+                    }
+                    container.addView(summaryRow)
+                }
+
+                val separator = View(this@SavingsActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        1.dp()
+                    ).apply {
+                        topMargin = 10.dp()
+                        bottomMargin = 10.dp()
+                    }
+                    setBackgroundColor(getColor(android.R.color.darker_gray))
+                }
+                container.addView(separator)
+
+                val historyTitle = TextView(this@SavingsActivity).apply {
+                    text = "Historia:"
+                    textSize = 16f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(textColor)
+                    setPadding(0, 0, 0, 8.dp())
+                }
+                container.addView(historyTitle)
+
+                contributions.forEach { contribution ->
+                    val date = SimpleDateFormat("dd.MM.yyyy", LocaleUtils.POLISH)
+                        .format(Date(contribution.timestamp))
+                    val sign = if (contribution.amount < 0) "-" else "+"
+                    val historyRow = TextView(this@SavingsActivity).apply {
+                        text = "${contribution.personName}: $sign${MoneyFormatter.formatWithCurrency(abs(contribution.amount))} â€˘ $date"
+                        textSize = 14f
+                        setTextColor(if (contribution.amount < 0) negativeColor else positiveColor)
+                        setPadding(0, 2.dp(), 0, 2.dp())
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            bottomMargin = 6.dp()
+                        }
+                    }
+                    container.addView(historyRow)
+                }
+
+                AlertDialog.Builder(this@SavingsActivity)
+                    .setTitle("Historia wpĹ‚at - ${goal.title}")
+                    .setView(scrollView)
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        }
+    }
+
     // Usuwanie celu
     private fun deleteGoal(goal: SavingsGoal) {
         AlertDialog.Builder(this)
-            .setTitle("Usuń cel")
-            .setMessage("Czy na pewno chcesz usunąć cel \"${goal.title}\"?")
+            .setTitle("UsuĹ„ cel")
+            .setMessage("Czy na pewno chcesz usunÄ…Ä‡ cel \"${goal.title}\"?")
             .setPositiveButton("Tak") { _, _ ->
                 // Najpierw anuluj wszystkie alarmy dla tego celu
                 SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, goal.id)
                 val db = AppDatabase.getDatabase(this)
-                lifecycleScope.launch {
+                launchBlockingAction("Usuwanie celu...") {
                     val shouldQueueDelete = try {
                         if (goal.remoteId != null) {
                             SavingsRemoteRepository.deleteGoal(goal.remoteId!!)

@@ -1,12 +1,16 @@
 package com.example.homebudget.ui.dashboard
 
 import android.app.AlertDialog
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.icu.util.Calendar
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings as AndroidSettings
 import android.text.InputType
 import android.text.Spannable
 import android.text.SpannableString
@@ -45,6 +49,7 @@ import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.data.sync.SyncProcessor
 import com.example.homebudget.work.worker.WorkSchedulerSupabase
 import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmScheduler
+import com.example.homebudget.ui.common.loading.LoadingOverlayController
 import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.settings.Prefs
@@ -55,6 +60,7 @@ import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
 import com.github.mikephil.charting.formatter.PercentFormatter
+import com.github.mikephil.charting.formatter.ValueFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -68,6 +74,9 @@ import kotlin.collections.iterator
 
 //DashboardActivity.kt – główny ekran po zalogowaniu (nawigacja do pozostałych sekcji).
 class DashboardActivity : AppCompatActivity() {
+    companion object {
+        private const val MIN_SLICE_LABEL_PERCENT = 8.0
+    }
 
     private var userId: Int = -1
     private var firstLoadDone = false
@@ -85,6 +94,7 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var buttonBillsPlanner: Button
     private lateinit var buttonStatistics: Button
     private lateinit var buttonSettings: Button
+    private lateinit var loadingOverlay: LoadingOverlayController
     private var selectedYear = LocalDate.now().year
     private var selectedMonth = LocalDate.now().monthValue
 
@@ -93,6 +103,7 @@ class DashboardActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // Dopiero layout
         setContentView(R.layout.activity_dashboard)
+        loadingOverlay = LoadingOverlayController(this)
 
         textWelcome = findViewById(R.id.textWelcome)
         pieChart = findViewById(R.id.pieChart)
@@ -359,6 +370,7 @@ class DashboardActivity : AppCompatActivity() {
         pieChart.setEntryLabelColor(labelColor)
         pieChart.setCenterTextColor(labelColor)
         pieChart.setEntryLabelTextSize(12f)
+        pieChart.setDrawEntryLabels(true)
         //Wyłącz domyślną legendę (mini legendę pod wykresem)
         pieChart.legend.isEnabled = false
     }
@@ -369,7 +381,9 @@ class DashboardActivity : AppCompatActivity() {
                 Configuration.UI_MODE_NIGHT_MASK) ==
                 Configuration.UI_MODE_NIGHT_YES
 
+        loadingOverlay.show("Ładowanie dashboardu...")
         lifecycleScope.launch {
+            try {
             val db = AppDatabase.Companion.getDatabase(this@DashboardActivity)
             val settingsDao = db.settingsDao()
             val expenseDao = db.expenseDao()
@@ -463,7 +477,9 @@ class DashboardActivity : AppCompatActivity() {
             //Tworzymy wykres na podstawie danych historycznych - nawet jesli kategoria już nie istnieje
             for ((cat, total) in sumsMap) {
                 val categoryName = cat.ifBlank { "Inne" } //Jeśli puste, to "Inne"
-                entries.add(PieEntry(total.toFloat(), categoryName))
+                val categoryPercent = if (totalSpent > 0.0) (total / totalSpent) * 100 else 0.0
+                val chartLabel = if (categoryPercent >= MIN_SLICE_LABEL_PERCENT) categoryName else ""
+                entries.add(PieEntry(total.toFloat(), chartLabel))
                 displayCategories.add(categoryName)
             }
 
@@ -472,7 +488,9 @@ class DashboardActivity : AppCompatActivity() {
             val isNoData = !hasAnyValue
             if (isNoData) {
                 entries.clear()
-                entries.add(PieEntry(1f, "Brak wydatków"))
+                displayCategories.clear()
+                entries.add(PieEntry(1f, ""))
+                displayCategories.add("Brak wydatkow")
             }
 
             val dataSet = PieDataSet(entries, "")
@@ -482,8 +500,9 @@ class DashboardActivity : AppCompatActivity() {
             val colors = if (isNoData) {
                 listOf(NO_DATA_COLOR)
             } else {
-                entries.map { entry ->
-                    val hex = categoryColorsMap.optString(entry.label, "")
+                entries.mapIndexed { index, entry ->
+                    val categoryKey = displayCategories.getOrNull(index) ?: entry.label
+                    val hex = categoryColorsMap.optString(categoryKey, "")
                     if (hex.isNotEmpty()) Color.parseColor(hex)
                     else ColorUtils.getRandomColor()
                 }
@@ -491,10 +510,17 @@ class DashboardActivity : AppCompatActivity() {
             dataSet.colors = colors
 
             val data = PieData(dataSet)
-            data.setValueFormatter(PercentFormatter(pieChart)) // procenty na wykresie
+            val percentFormatter = PercentFormatter(pieChart)
+            data.setValueFormatter(object : ValueFormatter() {
+                override fun getPieLabel(value: Float, pieEntry: PieEntry?): String {
+                    if (isNoData || pieEntry?.label.isNullOrBlank()) return ""
+                    return percentFormatter.getPieLabel(value, pieEntry)
+                }
+            })
             data.setValueTextSize(12f)
             data.setValueTextColor(Color.WHITE)
             pieChart.data = data
+            pieChart.setDrawEntryLabels(!isNoData)
 
             // Ustawienie bieżącego budżetu dla wybranego miesiąca z tabeli MonthlyBudget
             var currentMonthBudgetEntity = withContext(Dispatchers.IO) {
@@ -604,7 +630,7 @@ class DashboardActivity : AppCompatActivity() {
             categoriesContainer.removeAllViews()
 
             for (i in entries.indices) {
-                val label = entries[i].label
+                val label = displayCategories.getOrNull(i) ?: entries[i].label
                 val value = entries[i].value.toDouble()
                 val color = colors[i]
 
@@ -650,12 +676,12 @@ class DashboardActivity : AppCompatActivity() {
             val summaryColor = if (isDarkMode) Color.parseColor("#EAEAEA") else Color.parseColor("#202020")
             textSummary.setTextColor(summaryColor)
             val builder = StringBuilder()
-            builder.append("📊 Wydano: ${MoneyFormatter.formatWithCurrency(totalSpent)}\n\n")
-            builder.append("💰 Budżet: ${MoneyFormatter.formatWithCurrency(currentMonthBudget)}")
+            builder.append("💰 Budżet: ${MoneyFormatter.formatWithCurrency(currentMonthBudget)}\n\n")
+            builder.append("📊 Wydano: ${MoneyFormatter.formatWithCurrency(totalSpent)}")
             val spannable = SpannableString(
                 if (currentMonthBudget > 0 && totalSpent > currentMonthBudget) {
                     val exceeded = totalSpent - currentMonthBudget
-                    builder.append("\n\n❌ Przekroczono o: ${MoneyFormatter.formatWithCurrency(exceeded)}")
+                    builder.append("\n\nPrzekroczono o: ${MoneyFormatter.formatWithCurrency(exceeded)}")
                     builder.toString()
                 } else {
                     builder.toString()
@@ -663,7 +689,7 @@ class DashboardActivity : AppCompatActivity() {
             )
             // Kolor tylko dla przekroczenia
             if (currentMonthBudget > 0 && totalSpent > currentMonthBudget) {
-                val start = spannable.indexOf("❌")
+                val start = spannable.indexOf("Przekroczono o:")
                 spannable.setSpan(
                     ForegroundColorSpan(Color.parseColor("#E74C3C")),
                     start,
@@ -676,6 +702,9 @@ class DashboardActivity : AppCompatActivity() {
 
             // 🔸 Sprawdzenie, czy przekroczono 80% lub 100% budżetu
             checkBudgetWarning(totalSpent, currentMonthBudget)
+            } finally {
+                loadingOverlay.hide()
+            }
         }
     }
 
@@ -789,6 +818,7 @@ class DashboardActivity : AppCompatActivity() {
         if (!firstLoadDone) {
             loadAndShowData()
         }
+        DashboardBudgetAlarmScheduler.scheduleDailyBudgetCheck(this)
         updateMonthLabel()
         updateMonthButtons()
     }

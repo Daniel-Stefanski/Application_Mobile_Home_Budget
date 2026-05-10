@@ -1,12 +1,16 @@
 ﻿package com.example.homebudget.ui.settings
 
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
+import android.provider.Settings as AndroidSettings
 import android.view.Gravity
 import android.view.View
 import android.widget.AdapterView
@@ -58,6 +62,8 @@ import java.util.Locale
 class SettingsActivity : AppCompatActivity(){
 
     private var userId: Int = -1
+    private lateinit var textExactAlarmStatus: TextView
+    private lateinit var buttonExactAlarmSettings: Button
 
     companion object {
         private const val ARROW_EXPANDED = "\u25B2"
@@ -84,6 +90,9 @@ class SettingsActivity : AppCompatActivity(){
         val editNewPassword = findViewById<EditText>(R.id.editTextNewPassword)
         val checkboxShowPasswordSettings = findViewById<CheckBox>(R.id.checkboxShowPasswordSettings)
         val checkboxNotifications = findViewById<CheckBox>(R.id.checkboxNotifications)
+        val textExactAlarmInfo = findViewById<TextView>(R.id.textExactAlarmInfo)
+        textExactAlarmStatus = findViewById(R.id.textExactAlarmStatus)
+        buttonExactAlarmSettings = findViewById(R.id.buttonExactAlarmSettings)
         val buttonDeleteAccount = findViewById<TextView>(R.id.buttonDeleteAccount)
         val buttonSaveChanges = findViewById<Button>(R.id.buttonSaveAccountChanges)
 
@@ -181,6 +190,8 @@ class SettingsActivity : AppCompatActivity(){
         //WĹ‚Ä…cz/wyĹ‚Ä…cz powiadomienia
         //Wczytanie
         checkboxNotifications.isChecked = Prefs.isNotificationsEnabled(this)
+        textExactAlarmInfo.text =
+            "Aktualne godziny powiadomień:\n• Budżet: 19:00\n• Rachunki planowane: 08:00\n• Cele oszczędnościowe: 08:00"
         //Zapisz
         checkboxNotifications.setOnCheckedChangeListener { _, isChecked ->
             Prefs.setNotificationsEnabled(this, isChecked)
@@ -194,6 +205,12 @@ class SettingsActivity : AppCompatActivity(){
 
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
+
+        buttonExactAlarmSettings.setOnClickListener {
+            openExactAlarmSettings()
+        }
+        updateExactAlarmPreferenceState()
+
         editName.filters = arrayOf(InputFilter.LengthFilter(20))
         buttonSaveChanges.setOnClickListener {
             val newName = editName.text.toString().trim().take(20)
@@ -1192,6 +1209,61 @@ class SettingsActivity : AppCompatActivity(){
                     override fun onNothingSelected(parent: AdapterView<*>) {}
                 }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::textExactAlarmStatus.isInitialized && ::buttonExactAlarmSettings.isInitialized) {
+            updateExactAlarmPreferenceState()
+        }
+    }
+
+    private fun updateExactAlarmPreferenceState() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            textExactAlarmStatus.text =
+                "Na tej wersji Androida dodatkowa zgoda na dokładne alarmy nie jest wymagana."
+            textExactAlarmStatus.setTextColor(Color.parseColor("#2E7D32"))
+            buttonExactAlarmSettings.text = "Dokładne alarmy niewymagane"
+            buttonExactAlarmSettings.isEnabled = false
+            buttonExactAlarmSettings.alpha = 0.6f
+            return
+        }
+
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        val exactAlarmEnabled = alarmManager?.canScheduleExactAlarms() == true
+
+        textExactAlarmStatus.text = if (exactAlarmEnabled) {
+            "Dokładne alarmy są włączone. Powiadomienia mają większą szansę przychodzić punktualnie."
+        } else {
+            "Dokładne alarmy są wyłączone. Powiadomienia nadal będą działać, ale mogą przychodzić z opóźnieniem."
+        }
+        textExactAlarmStatus.setTextColor(
+            if (exactAlarmEnabled) Color.parseColor("#2E7D32") else Color.parseColor("#B26A00")
+        )
+
+        buttonExactAlarmSettings.text = if (exactAlarmEnabled) {
+            "Otwórz ustawienia dokładnych alarmów"
+        } else {
+            "Włącz dokładne alarmy"
+        }
+        buttonExactAlarmSettings.isEnabled = true
+        buttonExactAlarmSettings.alpha = 1f
+    }
+
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            Toast.makeText(
+                this,
+                "Na tej wersji Androida dodatkowe ustawienie dokładnych alarmów nie jest wymagane.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val intent = Intent(AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        startActivity(intent)
     }
 
     private fun updateNotificationSchedules(enabled: Boolean) {

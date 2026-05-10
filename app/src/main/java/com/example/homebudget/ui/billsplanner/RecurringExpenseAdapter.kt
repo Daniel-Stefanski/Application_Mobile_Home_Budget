@@ -72,7 +72,7 @@ class RecurringExpenseAdapter(
         }
 
         val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-        val dateText = "Termin platnosci: ${sdf.format(Date(bill.date))}"
+        val dateText = "Termin płatności: ${sdf.format(Date(bill.date))}"
 
         val daysInfo = if (isUnpaidStatus(bill.status)) {
             getDaysInfo(bill.date)
@@ -86,14 +86,14 @@ class RecurringExpenseAdapter(
         }
 
         val intervalText = when (bill.repeatInterval) {
-            1 -> "co miesiac"
-            2 -> "co 2 miesiace"
-            3 -> "co 3 miesiace"
-            6 -> "co 6 miesiecy"
-            12 -> "co 12 miesiecy"
-            else -> "co ${bill.repeatInterval} miesiecy"
+            1 -> "co miesiąc"
+            2 -> "co 2 miesiące"
+            3 -> "co 3 miesiące"
+            6 -> "co 6 miesięcy"
+            12 -> "co 12 miesięcy"
+            else -> "co ${bill.repeatInterval} miesięcy"
         }
-        holder.textRecurring.text = "Powtarza sie: $intervalText"
+        holder.textRecurring.text = "Powtarza się: $intervalText"
 
         val context = holder.itemView.context
         if (isUnpaidStatus(bill.status)) {

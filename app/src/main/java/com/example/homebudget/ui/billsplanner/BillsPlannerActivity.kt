@@ -1,8 +1,12 @@
 ﻿package com.example.homebudget.ui.billsplanner
 
+import android.app.AlarmManager
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -20,6 +24,7 @@ import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
 import com.example.homebudget.notifications.scheduler.BillsAlarmScheduler
+import com.example.homebudget.ui.common.loading.LoadingOverlayController
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.money.MoneyFormatter
 import com.example.homebudget.utils.settings.Prefs
@@ -37,10 +42,12 @@ class BillsPlannerActivity : AppCompatActivity() {
     private lateinit var adapter: RecurringExpenseAdapter
     private lateinit var buttonAddBill: Button
     private lateinit var textBillsSummary: TextView
+    private lateinit var loadingOverlay: LoadingOverlayController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_bills_planner)
+        loadingOverlay = LoadingOverlayController(this)
 
         recyclerView = findViewById(R.id.recyclerBills)
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -65,7 +72,7 @@ class BillsPlannerActivity : AppCompatActivity() {
         if (userId != -1) {
             loadRecurringBills()
         } else {
-            Toast.makeText(this, "Brak zalogowanego uzytkownika", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Brak zalogowanego użytkownika", Toast.LENGTH_SHORT).show()
         }
 
         findViewById<Button>(R.id.buttonBackToMain).setOnClickListener {
@@ -81,31 +88,36 @@ class BillsPlannerActivity : AppCompatActivity() {
     }
 
     private fun loadRecurringBills() {
+        loadingOverlay.show("Ładowanie rachunków...")
         lifecycleScope.launch {
-            val db = AppDatabase.getDatabase(this@BillsPlannerActivity)
-            val recurringBills: List<Expense> = withContext(Dispatchers.IO) {
-                db.expenseDao().getRecurringExpenses(userId)
+            try {
+                val db = AppDatabase.getDatabase(this@BillsPlannerActivity)
+                val recurringBills: List<Expense> = withContext(Dispatchers.IO) {
+                    db.expenseDao().getRecurringExpenses(userId)
+                }
+
+                val sortedBills = recurringBills.sortedWith(
+                    compareBy<Expense> { isPaidStatus(it.status) }
+                        .thenBy { it.date }
+                )
+
+                adapter.updateData(sortedBills)
+
+                val emptyPlanner = findViewById<TextView>(R.id.textEmptyPlanner)
+                if (sortedBills.isEmpty()) {
+                    recyclerView.visibility = View.GONE
+                    emptyPlanner.visibility = View.VISIBLE
+                } else {
+                    recyclerView.visibility = View.VISIBLE
+                    emptyPlanner.visibility = View.GONE
+                }
+
+                val totalCount = sortedBills.size
+                val totalAmount = sortedBills.sumOf { it.amount }
+                textBillsSummary.text = "Rachunki: $totalCount | Suma: ${MoneyFormatter.formatWithCurrency(totalAmount)}"
+            } finally {
+                loadingOverlay.hide()
             }
-
-            val sortedBills = recurringBills.sortedWith(
-                compareBy<Expense> { isPaidStatus(it.status) }
-                    .thenBy { it.date }
-            )
-
-            adapter.updateData(sortedBills)
-
-            val emptyPlanner = findViewById<TextView>(R.id.textEmptyPlanner)
-            if (sortedBills.isEmpty()) {
-                recyclerView.visibility = View.GONE
-                emptyPlanner.visibility = View.VISIBLE
-            } else {
-                recyclerView.visibility = View.VISIBLE
-                emptyPlanner.visibility = View.GONE
-            }
-
-            val totalCount = sortedBills.size
-            val totalAmount = sortedBills.sumOf { it.amount }
-            textBillsSummary.text = "Rachunki: $totalCount | Suma: ${MoneyFormatter.formatWithCurrency(totalAmount)}"
         }
     }
 
@@ -244,8 +256,31 @@ class BillsPlannerActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        rescheduleBillsReminders()
         if (userId != -1) {
             loadRecurringBills()
+        }
+    }
+
+    private fun rescheduleBillsReminders() {
+        if (userId == -1 || !Prefs.isNotificationsEnabled(this)) return
+
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(this@BillsPlannerActivity)
+            val recurringBills = withContext(Dispatchers.IO) {
+                db.expenseDao().getRecurringExpenses(userId)
+            }
+
+            recurringBills.forEach { expense ->
+                BillsAlarmScheduler.cancelAllReminders(this@BillsPlannerActivity, expense.id)
+                if (!isPaidStatus(expense.status)) {
+                    BillsAlarmScheduler.scheduleAllRemindersForDate(
+                        this@BillsPlannerActivity,
+                        expense.id,
+                        expense.date
+                    )
+                }
+            }
         }
     }
 }

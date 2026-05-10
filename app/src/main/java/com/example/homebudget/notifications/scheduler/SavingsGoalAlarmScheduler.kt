@@ -11,6 +11,11 @@ import com.example.homebudget.utils.settings.Prefs
 import java.util.Calendar
 
 object SavingsGoalAlarmScheduler {
+    fun canScheduleExactAlarm(context: Context): Boolean {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+    }
+
     private fun pendingIntentFor(context: Context, goalId: Int, slot: Int): PendingIntent {
         val intent = Intent(context, SavingsGoalNotificationReceiver::class.java).apply {
             putExtra("goalId", goalId)
@@ -31,8 +36,8 @@ object SavingsGoalAlarmScheduler {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pi = pendingIntentFor(context, goalId, slot)
         try {
-            val canUseExactAlarm = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                alarmManager.canScheduleExactAlarms()
+            val canUseExactAlarm = canScheduleExactAlarm(context)
+            alarmManager.cancel(pi)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && canUseExactAlarm) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)

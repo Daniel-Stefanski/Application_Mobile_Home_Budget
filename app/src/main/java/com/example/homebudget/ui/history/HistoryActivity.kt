@@ -22,6 +22,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.data.entity.Expense
+import com.example.homebudget.ui.common.loading.LoadingOverlayController
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.settings.Prefs
@@ -36,6 +37,7 @@ class HistoryActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: ExpenseAdapter
     private lateinit var allExpenses: List<Expense>
+    private lateinit var loadingOverlay: LoadingOverlayController
     private var userId: Int = -1
     private lateinit var db: AppDatabase
 
@@ -51,6 +53,7 @@ class HistoryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_history)
+        loadingOverlay = LoadingOverlayController(this)
 
         recyclerView = findViewById(R.id.recyclerExpenses)
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -74,13 +77,7 @@ class HistoryActivity : AppCompatActivity() {
 
         db = AppDatabase.getDatabase(this)
 
-        lifecycleScope.launch {
-           allExpenses = db.expenseDao().getExpensesForUser(userId)
-            runOnUiThread {
-                //ustawienia danych
-                adapter.updateData(allExpenses)
-            }
-        }
+        reloadExpenses()
 
         //Obsługa wyszukiwania
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -108,6 +105,20 @@ class HistoryActivity : AppCompatActivity() {
             val intent = Intent(this, DashboardActivity::class.java)
             startActivity(intent)
             finish()
+        }
+    }
+
+    private fun reloadExpenses() {
+        loadingOverlay.show("Ładowanie historii...")
+        lifecycleScope.launch {
+            try {
+                allExpenses = db.expenseDao().getExpensesForUser(userId)
+                runOnUiThread {
+                    adapter.updateData(allExpenses)
+                }
+            } finally {
+                loadingOverlay.hide()
+            }
         }
     }
 
@@ -256,9 +267,6 @@ class HistoryActivity : AppCompatActivity() {
     }
     override fun onResume() {
         super.onResume()
-        lifecycleScope.launch {
-            allExpenses = db.expenseDao().getExpensesForUser(userId)
-            adapter.updateData(allExpenses)
-        }
+        reloadExpenses()
     }
 }

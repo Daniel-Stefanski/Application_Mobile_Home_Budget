@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
+import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,6 +32,7 @@ class ResetPasswordActivity : AppCompatActivity() {
     private lateinit var buttonResetPassword: Button
     private lateinit var textBackToLogin: TextView
     private lateinit var progressBar: ProgressBar
+    private lateinit var loadingDialog: LoadingDialogController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
@@ -41,6 +43,8 @@ class ResetPasswordActivity : AppCompatActivity() {
         buttonResetPassword = findViewById(R.id.buttonResetPassword)
         textBackToLogin = findViewById(R.id.textBackToLogin)
         progressBar = findViewById(R.id.progressBar)
+        progressBar.visibility = View.GONE
+        loadingDialog = LoadingDialogController(this)
 
         buttonResetPassword.setOnClickListener {
             val email = editTextEmail.text.toString().trim().lowercase()
@@ -68,52 +72,54 @@ class ResetPasswordActivity : AppCompatActivity() {
 
     private fun sendResetRequest(email: String) {
         buttonResetPassword.isEnabled = false
-        progressBar.visibility = View.VISIBLE
+        loadingDialog.show("Wysyłanie zgłoszenia resetu...")
 
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    val url = URL("https://jojigot576.app.n8n.cloud/webhook/request-password-reset")
-                    val connection = url.openConnection() as HttpURLConnection
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        val url = URL("https://jojigot576.app.n8n.cloud/webhook/request-password-reset")
+                        val connection = url.openConnection() as HttpURLConnection
 
-                    connection.requestMethod = "POST"
-                    connection.setRequestProperty("Content-Type", "application/json")
-                    connection.doOutput = true
-                    connection.connectTimeout = 15000
-                    connection.readTimeout = 15000
+                        connection.requestMethod = "POST"
+                        connection.setRequestProperty("Content-Type", "application/json")
+                        connection.doOutput = true
+                        connection.connectTimeout = 15000
+                        connection.readTimeout = 15000
 
-                    val jsonBody = JSONObject().apply {
-                        put("email", email)
+                        val jsonBody = JSONObject().apply {
+                            put("email", email)
+                        }
+
+                        BufferedWriter(OutputStreamWriter(connection.outputStream)).use { writer ->
+                            writer.write(jsonBody.toString())
+                            writer.flush()
+                        }
+
+                        val responseCode = connection.responseCode
+                        val responseText = if (responseCode in 200..299) {
+                            connection.inputStream.bufferedReader().use { it.readText() }
+                        } else {
+                            connection.errorStream?.bufferedReader()?.use { it.readText() }
+                                ?: "Błąd połączenia z serwerem. Przepraszamy"
+                        }
+
+                        Result.success(responseText)
+                    } catch (e: Exception) {
+                        Result.failure(e)
                     }
-
-                    BufferedWriter(OutputStreamWriter(connection.outputStream)).use { writer ->
-                        writer.write(jsonBody.toString())
-                        writer.flush()
-                    }
-
-                    val responseCode = connection.responseCode
-                    val responseText = if (responseCode in 200..299) {
-                        connection.inputStream.bufferedReader().use { it.readText() }
-                    } else {
-                        connection.errorStream?.bufferedReader()?.use { it.readText() }
-                            ?: "Błąd połączenia z serwerem. Przepraszamy"
-                    }
-
-                    Result.success(responseText)
-                } catch (e: Exception) {
-                    Result.failure(e)
                 }
-            }
 
-            progressBar.visibility = View.GONE
-            buttonResetPassword.isEnabled = true
-
-            if (result.isSuccess) {
-                Prefs.setPendingPasswordResetEmail(this@ResetPasswordActivity, email)
-                showSuccessDialog()
-            } else {
-                Toast.makeText(this@ResetPasswordActivity, "Nie udało się wysyłać zgłoszenie resetu. Sprawdź internet i spróbuj ponownie.",
-                    Toast.LENGTH_LONG).show()
+                if (result.isSuccess) {
+                    Prefs.setPendingPasswordResetEmail(this@ResetPasswordActivity, email)
+                    showSuccessDialog()
+                } else {
+                    Toast.makeText(this@ResetPasswordActivity, "Nie udało się wysyłać zgłoszenie resetu. Sprawdź internet i spróbuj ponownie.",
+                        Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                loadingDialog.hide()
+                buttonResetPassword.isEnabled = true
             }
         }
     }

@@ -25,6 +25,7 @@ import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import com.example.homebudget.data.sync.PendingSyncHelper
 import com.example.homebudget.data.sync.SyncConstants
+import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.locale.LocaleUtils
 import com.example.homebudget.utils.money.MoneyFormatter
@@ -55,6 +56,7 @@ class AddExpenseActivity : AppCompatActivity() {
     private lateinit var recurringCheckBox: CheckBox
     private lateinit var layoutCycle: LinearLayout
     private lateinit var spinnerCycle: Spinner
+    private lateinit var loadingDialog: LoadingDialogController
     private var selectedDate: Long = System.currentTimeMillis()
     private var defaultCategoryIndex: Int = 0
     private var defaultPaymentIndex: Int = 0
@@ -75,6 +77,8 @@ class AddExpenseActivity : AppCompatActivity() {
         recurringCheckBox = findViewById(R.id.checkboxRecurring)
         layoutCycle = findViewById(R.id.layoutCycle)
         spinnerCycle = findViewById(R.id.spinnerCycle)
+        loadingDialog = LoadingDialogController(this)
+        updateSaveButtonState(false)
 
         setupCategorySpinner()
         setupPaymentSpinner()
@@ -294,7 +298,7 @@ class AddExpenseActivity : AppCompatActivity() {
         val categoryValid = category.isNotBlank() && category != "Brak"
         val paymentValid = payment.isNotBlank() && payment != "Brak"
 
-        saveButton.isEnabled = amountValid && descriptionValid && categoryValid && paymentValid
+        updateSaveButtonState(amountValid && descriptionValid && categoryValid && paymentValid)
 
         // czerwona ramka + error
         if (!amountValid) amountInput.error = "Podaj prawidłową kwotę" else amountInput.error = null
@@ -303,6 +307,11 @@ class AddExpenseActivity : AppCompatActivity() {
         //zabezpieczenie: sprawdzamy czy selectedView to TextView
         (categorySpinner.selectedView as? TextView)?.error = if (!categoryValid) "Wybierz kategorię" else null
         (paymentSpinner.selectedView as? TextView)?.error = if (!paymentValid) "Wybierz metodę" else null
+    }
+
+    private fun updateSaveButtonState(isEnabled: Boolean) {
+        saveButton.isEnabled = isEnabled
+        saveButton.alpha = if (isEnabled) 1f else 0.45f
     }
 
     private fun saveExpense() {
@@ -348,8 +357,11 @@ class AddExpenseActivity : AppCompatActivity() {
             person = person
         )
 
+        saveButton.isEnabled = false
+        loadingDialog.show("Zapisywanie wydatku...")
         lifecycleScope.launch {
-            val db = AppDatabase.getDatabase(this@AddExpenseActivity)
+            try {
+                val db = AppDatabase.getDatabase(this@AddExpenseActivity)
 
             withContext(Dispatchers.IO) {
                 // Zapis zawsze lokalnie
@@ -397,7 +409,7 @@ class AddExpenseActivity : AppCompatActivity() {
                 }
             }
 
-            withContext(Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                 // ✅ Dialog potwierdzający
                 val dialog = AlertDialog.Builder(this@AddExpenseActivity)
                     .setTitle("✔️ Wydatek zapisany")
@@ -411,7 +423,11 @@ class AddExpenseActivity : AppCompatActivity() {
                         finish()
                     }
                     .create()
-                dialog.show()
+                    dialog.show()
+                }
+            } finally {
+                loadingDialog.hide()
+                validateForm()
             }
         }
     }

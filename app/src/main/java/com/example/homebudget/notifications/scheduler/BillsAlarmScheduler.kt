@@ -19,6 +19,11 @@ object BillsAlarmScheduler {
     private const val SLOT_TWO_DAYS_OVERDUE = 6
     private const val SLOT_THREE_DAYS_OVERDUE = 7
 
+    fun canScheduleExactAlarm(context: Context): Boolean {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+    }
+
     private fun pendingIntentFor(context: Context, expenseId: Int, slot: Int): PendingIntent {
         val intent = Intent(context, BillsNotificationReceiver::class.java).apply {
             putExtra("expenseId", expenseId)
@@ -41,8 +46,8 @@ object BillsAlarmScheduler {
         val pi = pendingIntentFor(context, expenseId, slot)
 
         try {
-            val canUseExactAlarm = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                alarmManager.canScheduleExactAlarms()
+            val canUseExactAlarm = canScheduleExactAlarm(context)
+            alarmManager.cancel(pi)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && canUseExactAlarm) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)

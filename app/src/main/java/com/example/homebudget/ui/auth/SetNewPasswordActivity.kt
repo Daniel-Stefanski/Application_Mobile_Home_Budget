@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
+import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +34,7 @@ class SetNewPasswordActivity : AppCompatActivity() {
     private lateinit var buttonSetPassword: Button
     private lateinit var textBackToLogin: TextView
     private lateinit var progressBar: ProgressBar
+    private lateinit var loadingDialog: LoadingDialogController
 
     private var resetToken: String? = null
 
@@ -47,6 +49,8 @@ class SetNewPasswordActivity : AppCompatActivity() {
         buttonSetPassword = findViewById(R.id.buttonSetPassword)
         textBackToLogin = findViewById(R.id.textBackToLogin)
         progressBar = findViewById(R.id.progressBar)
+        progressBar.visibility = View.GONE
+        loadingDialog = LoadingDialogController(this)
 
         findViewById<View>(R.id.imagePasswordInfo).setOnClickListener {
             AlertDialog.Builder(this)
@@ -126,7 +130,7 @@ class SetNewPasswordActivity : AppCompatActivity() {
 
     private fun sendChangePasswordRequest(token: String, newPassword: String) {
         buttonSetPassword.isEnabled = false
-        progressBar.visibility = View.VISIBLE
+        loadingDialog.show("Zmiana hasła...")
 
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -163,7 +167,7 @@ class SetNewPasswordActivity : AppCompatActivity() {
                 }
             }
 
-            progressBar.visibility = View.GONE
+            loadingDialog.hide()
             buttonSetPassword.isEnabled = true
 
             if (result == null) {

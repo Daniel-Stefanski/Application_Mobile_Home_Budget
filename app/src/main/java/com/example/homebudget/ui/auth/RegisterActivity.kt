@@ -3,10 +3,12 @@
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextPaint
+import android.text.TextWatcher
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.util.Patterns
@@ -27,6 +29,7 @@ import com.example.homebudget.data.entity.MonthlyBudget
 import com.example.homebudget.data.entity.Settings
 import com.example.homebudget.data.entity.User
 import com.example.homebudget.data.remote.AuthRepository
+import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.ThemeHelper
@@ -49,6 +52,7 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var loginText: TextView
     private lateinit var textReadTerms: TextView
     private lateinit var textTermsError: TextView
+    private lateinit var loadingDialog: LoadingDialogController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
@@ -63,6 +67,8 @@ class RegisterActivity : AppCompatActivity() {
         checkboxTerms = findViewById(R.id.checkBoxTerms)
         registerButton = findViewById(R.id.buttonRegister)
         progressBar = findViewById(R.id.progressBar)
+        progressBar.visibility = View.GONE
+        loadingDialog = LoadingDialogController(this)
         loginText = findViewById(R.id.textLogin)
         findViewById<View>(R.id.imagePasswordInfo).setOnClickListener {
             AlertDialog.Builder(this)
@@ -108,6 +114,17 @@ class RegisterActivity : AppCompatActivity() {
         val userDao = db.userDao()
         val settingsDao = db.settingsDao()
 
+        emailField.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+
+            override fun afterTextChanged(s: Editable?) {
+                if (emailField.error != null) {
+                    resetEmailErrorState()
+                }
+            }
+        })
+
         checkboxShowPassword.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 passwordField.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
@@ -130,15 +147,15 @@ class RegisterActivity : AppCompatActivity() {
             var isValid = true
 
             nameField.error = null
-            emailField.error = null
+            resetEmailErrorState()
             passwordField.error = null
             confirmPasswordField.error = null
 
             if (email.isEmpty()) {
-                showFieldError(emailField, "Email jest wymagany")
+                showEmailError("Email jest wymagany")
                 isValid = false
-            } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                showFieldError(emailField, "Niepoprawny adres email")
+            } else if (!isEmailValid(email)) {
+                showEmailError("Niepoprawny adres email")
                 isValid = false
             }
             if (password.isEmpty()) {
@@ -165,99 +182,106 @@ class RegisterActivity : AppCompatActivity() {
             }
             if (!isValid) return@setOnClickListener
 
-            progressBar.visibility = View.VISIBLE
             registerButton.isEnabled = false
+            loadingDialog.show("Tworzenie konta...")
 
             lifecycleScope.launch {
-                val existingUser = withContext(Dispatchers.IO) {
-                    userDao.getUserByUsername(email)
-                }
-                if (existingUser != null) {
-                    runOnUiThread {
-                        progressBar.visibility = View.GONE
-                        registerButton.isEnabled = true
-                        emailField.error = "Email juz istnieje"
+                try {
+                    val existingUser = withContext(Dispatchers.IO) {
+                        userDao.getUserByUsername(email)
                     }
-                } else {
-                    val supaResult = AuthRepository.signUp(email, password)
-
-                    if (supaResult.isFailure) {
-                        withContext(Dispatchers.Main) {
-                            progressBar.visibility = View.GONE
+                    if (existingUser != null) {
+                        runOnUiThread {
                             registerButton.isEnabled = true
-                            Toast.makeText(
-                                this@RegisterActivity,
-                                "Supabase: ${supaResult.exceptionOrNull()?.message}",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            showEmailError("Email juz istnieje")
                         }
-                        return@launch
+                    } else {
+                        val supaResult = AuthRepository.signUp(email, password)
+
+                        if (supaResult.isFailure) {
+                            val exception = supaResult.exceptionOrNull()
+                            withContext(Dispatchers.Main) {
+                                registerButton.isEnabled = true
+                                if (isEmailAlreadyRegisteredError(exception)) {
+                                    showEmailError("Email juz istnieje")
+                                } else {
+                                    Toast.makeText(
+                                        this@RegisterActivity,
+                                        "Supabase: ${exception?.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                            return@launch
+                        }
+
+                        val supabaseUser = supaResult.getOrThrow()
+                        val supabaseUid = supabaseUser.id
+
+                        withContext(Dispatchers.Main) {
+                            Prefs.setSupabaseUid(this@RegisterActivity, supabaseUid)
+                        }
+
+                        val currentTime = System.currentTimeMillis()
+                        val safeName = name.trim().take(20)
+                        val newUser = User(
+                            id = 0,
+                            name = safeName,
+                            username = email,
+                            password = password,
+                            createdAt = currentTime,
+                            lastLogin = currentTime
+                        )
+
+                        val userId = withContext(Dispatchers.IO) {
+                            userDao.insertUser(newUser).toInt()
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            Prefs.setUserId(this@RegisterActivity, userId)
+                            Prefs.setAppThemeForUser(this@RegisterActivity, userId, "light")
+                            ThemeHelper.applySavedTheme(Prefs.getAppTheme(this@RegisterActivity))
+                        }
+
+                        val defaultSettings = Settings(
+                            userId = userId,
+                            categories = "[\"Jedzenie\",\"Transport\",\"Rachunki\",\"Rozrywka\",\"Inne\"]",
+                            currency = "PLN",
+                            period = "Miesieczny",
+                            savingsGoal = 0.0
+                        )
+                        withContext(Dispatchers.IO) {
+                            settingsDao.insertSettings(defaultSettings)
+                        }
+
+                        val monthlyBudgetDao = db.monthlyBudgetDao()
+                        val currentDate = Calendar.getInstance()
+                        val currentYear = currentDate.get(Calendar.YEAR)
+                        val currentMonth = currentDate.get(Calendar.MONTH) + 1
+
+                        val newBudget = MonthlyBudget(
+                            userId = userId,
+                            year = currentYear,
+                            month = currentMonth,
+                            budget = 0.0,
+                            isDefault = false
+                        )
+                        withContext(Dispatchers.IO) {
+                            monthlyBudgetDao.insertBudget(newBudget)
+                        }
+
+                        runOnUiThread {
+                            registerButton.isEnabled = true
+                            Toast.makeText(this@RegisterActivity, "Konto utworzone", Toast.LENGTH_SHORT).show()
+
+                            val intent = Intent(this@RegisterActivity, DashboardActivity::class.java)
+                            startActivity(intent)
+                            finish()
+                        }
                     }
-
-                    val supabaseUser = supaResult.getOrThrow()
-                    val supabaseUid = supabaseUser.id
-
-                    withContext(Dispatchers.Main) {
-                        Prefs.setSupabaseUid(this@RegisterActivity, supabaseUid)
-                    }
-
-                    val currentTime = System.currentTimeMillis()
-                    val safeName = name.trim().take(20)
-                    val newUser = User(
-                        id = 0,
-                        name = safeName,
-                        username = email,
-                        password = password,
-                        createdAt = currentTime,
-                        lastLogin = currentTime
-                    )
-
-                    val userId = withContext(Dispatchers.IO) {
-                        userDao.insertUser(newUser).toInt()
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        Prefs.setUserId(this@RegisterActivity, userId)
-                        Prefs.setAppThemeForUser(this@RegisterActivity, userId, "light")
-                        ThemeHelper.applySavedTheme(Prefs.getAppTheme(this@RegisterActivity))
-                    }
-
-                    val defaultSettings = Settings(
-                        userId = userId,
-                        categories = "[\"Jedzenie\",\"Transport\",\"Rachunki\",\"Rozrywka\",\"Inne\"]",
-                        currency = "PLN",
-                        period = "Miesieczny",
-                        savingsGoal = 0.0
-                    )
-                    withContext(Dispatchers.IO) {
-                        settingsDao.insertSettings(defaultSettings)
-                    }
-
-                    val monthlyBudgetDao = db.monthlyBudgetDao()
-                    val currentDate = Calendar.getInstance()
-                    val currentYear = currentDate.get(Calendar.YEAR)
-                    val currentMonth = currentDate.get(Calendar.MONTH) + 1
-
-                    val newBudget = MonthlyBudget(
-                        userId = userId,
-                        year = currentYear,
-                        month = currentMonth,
-                        budget = 0.0,
-                        isDefault = false
-                    )
-                    withContext(Dispatchers.IO) {
-                        monthlyBudgetDao.insertBudget(newBudget)
-                    }
-
-                    runOnUiThread {
-                        progressBar.visibility = View.GONE
-                        registerButton.isEnabled = true
-                        Toast.makeText(this@RegisterActivity, "Konto utworzone", Toast.LENGTH_SHORT).show()
-
-                        val intent = Intent(this@RegisterActivity, DashboardActivity::class.java)
-                        startActivity(intent)
-                        finish()
-                    }
+                } finally {
+                    loadingDialog.hide()
+                    registerButton.isEnabled = true
                 }
             }
         }
@@ -267,6 +291,16 @@ class RegisterActivity : AppCompatActivity() {
             startActivity(intent)
             finish()
         }
+    }
+
+    private fun showEmailError(message: String) {
+        emailField.setBackgroundResource(R.drawable.shape_search_border_error)
+        emailField.error = message
+    }
+
+    private fun resetEmailErrorState() {
+        emailField.error = null
+        emailField.setBackgroundResource(R.drawable.shape_search_border)
     }
 
     private fun showFieldError(editText: EditText, message: String) {
@@ -281,6 +315,34 @@ class RegisterActivity : AppCompatActivity() {
     private fun isPasswordValid(password: String): Boolean {
         val regex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@#\$%^&+=!]).{8,}$")
         return regex.matches(password)
+    }
+
+    private fun isEmailValid(email: String): Boolean {
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) return false
+        if (email.contains("..")) return false
+
+        val parts = email.split("@")
+        if (parts.size != 2) return false
+
+        val localPart = parts[0]
+        val domainPart = parts[1]
+
+        return localPart.isNotEmpty() &&
+            domainPart.isNotEmpty() &&
+            !localPart.startsWith(".") &&
+            !localPart.endsWith(".") &&
+            !domainPart.startsWith(".") &&
+            !domainPart.endsWith(".")
+    }
+
+    private fun isEmailAlreadyRegisteredError(throwable: Throwable?): Boolean {
+        val message = throwable?.message?.lowercase() ?: return false
+        return message.contains("already registered") ||
+            message.contains("email exists") ||
+            message.contains("email already exists") ||
+            message.contains("email address already registered") ||
+            message.contains("user already registered") ||
+            message.contains("duplicate key")
     }
 
     @Deprecated("Deprecated in Java")

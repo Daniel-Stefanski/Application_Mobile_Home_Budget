@@ -72,25 +72,44 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="0dp"
+            android:padding="16dp"
             android:layout_marginBottom="12dp"
             android:elevation="4dp"
             android:background="@drawable/bg_summary_card">
             <TextView
+                android:id="@+id/textSummaryTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="Podsumowanie:"
+                android:textAlignment="viewStart"
+                android:gravity="start"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
                 android:id="@+id/textSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Budżet: 0 zł - Wydano: 0 zł"
+                android:text="💰 Budżet: 0 zł&#10;&#10;📊 Wydano: 0 zł"
                 android:textAlignment="viewStart"
                 android:gravity="start"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="?android:textColorPrimary"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
-                android:paddingTop="14dp"/>
+                android:lineSpacingExtra="4dp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/textLegendHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:text="Podsumowanie kategorii:"
+            android:textColor="?android:textColorPrimary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
         <!--Kontener dla legendy / listy kategorii-->
         <LinearLayout

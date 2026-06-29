@@ -68,7 +68,11 @@ class SetNewPasswordActivity : AppCompatActivity() {
                 .show()
         }
 
-        resetToken = intent?.data?.getQueryParameter("token")
+        resetToken = intent?.data?.getQueryParameter("access_token")
+            ?: intent?.data?.fragment
+                ?.split("&")
+                ?.firstOrNull { it.startsWith("access_token=") }
+                ?.substringAfter("access_token=")
 
         if (resetToken.isNullOrBlank()) {
             Toast.makeText(this, "Niepoprawny link resetu hasła", Toast.LENGTH_LONG).show()
@@ -135,7 +139,7 @@ class SetNewPasswordActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 try {
-                    val url = URL("https://jojigot576.app.n8n.cloud/webhook/set-new-password")
+                    val url = URL("https://bmfjcjakzvkrlptbbsqd.supabase.co/functions/v1/set-new-password")
                     val connection = url.openConnection() as HttpURLConnection
 
                     connection.requestMethod = "POST"
@@ -145,7 +149,7 @@ class SetNewPasswordActivity : AppCompatActivity() {
                     connection.readTimeout = 15000
 
                     val jsonBody = JSONObject().apply {
-                        put("token", token)
+                        put("accessToken", token)
                         put("newPassword", newPassword)
                     }
 

@@ -78,7 +78,7 @@ class ResetPasswordActivity : AppCompatActivity() {
             try {
                 val result = withContext(Dispatchers.IO) {
                     try {
-                        val url = URL("https://jojigot576.app.n8n.cloud/webhook/request-password-reset")
+                        val url = URL("https://bmfjcjakzvkrlptbbsqd.supabase.co/functions/v1/request-password-reset")
                         val connection = url.openConnection() as HttpURLConnection
 
                         connection.requestMethod = "POST"
@@ -104,7 +104,11 @@ class ResetPasswordActivity : AppCompatActivity() {
                                 ?: "Błąd połączenia z serwerem. Przepraszamy"
                         }
 
-                        Result.success(responseText)
+                        if (responseCode in 200..299) {
+                            Result.success(responseText)
+                        } else {
+                            Result.failure(Exception(responseText))
+                        }
                     } catch (e: Exception) {
                         Result.failure(e)
                     }

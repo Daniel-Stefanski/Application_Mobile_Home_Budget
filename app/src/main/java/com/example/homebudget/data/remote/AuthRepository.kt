@@ -3,6 +3,9 @@ package com.example.homebudget.data.remote
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.gotrue.user.UserInfo
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object AuthRepository {
 
@@ -36,6 +39,78 @@ object AuthRepository {
                 ?: return Result.failure(IllegalStateException("Brak użytkownika po logowaniu (currentUserOrNull = null)"))
 
             Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun changePassword(
+        oldPassword: String,
+        newPassword: String
+    ): Result<Unit> {
+        return try {
+
+            val currentUser = SupabaseClient.client.auth.currentUserOrNull()
+                ?: return Result.failure(
+                    IllegalStateException("Brak zalogowanego użytkownika")
+                )
+
+            val email = currentUser.email
+                ?: return Result.failure(
+                    IllegalStateException("Brak adresu email użytkownika")
+                )
+
+            // ponowne uwierzytelnienie użytkownika
+            SupabaseClient.client.auth.signInWith(Email) {
+                this.email = email
+                this.password = oldPassword
+            }
+
+            // zmiana hasła w Supabase Auth
+            SupabaseClient.client.auth.updateUser {
+                password = newPassword
+            }
+
+            Result.success(Unit)
+
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateAccountData(
+        newEmail: String? = null,
+        newName: String? = null
+    ): Result<Unit> {
+        return try {
+            val currentUser = SupabaseClient.client.auth.currentUserOrNull()
+                ?: return Result.failure(
+                    IllegalStateException("Brak zalogowanego użytkownika")
+                )
+
+            val trimmedEmail = newEmail?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+            val trimmedName = newName?.trim()?.takeIf { it.isNotBlank() }
+
+            if (trimmedEmail == null && trimmedName == null) {
+                return Result.success(Unit)
+            }
+
+            SupabaseClient.client.auth.updateUser {
+                if (trimmedEmail != null) {
+                    email = trimmedEmail
+                }
+
+                if (trimmedName != null) {
+                    data = buildJsonObject {
+                        currentUser.userMetadata?.forEach { (key, value) ->
+                            put(key, value)
+                        }
+                        put("name", JsonPrimitive(trimmedName))
+                    }
+                }
+            }
+
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

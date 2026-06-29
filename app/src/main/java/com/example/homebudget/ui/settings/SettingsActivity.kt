@@ -35,6 +35,7 @@ import com.example.homebudget.data.entity.Expense
 import com.example.homebudget.data.entity.PendingSync
 import com.example.homebudget.data.entity.Settings
 import com.example.homebudget.data.entity.SavingsGoal
+import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.data.remote.repository.ExpenseRemoteRepository
 import com.example.homebudget.data.remote.repository.MonthlyBudgetRemoteRepository
 import com.example.homebudget.data.remote.repository.SavingsRemoteRepository
@@ -222,20 +223,13 @@ class SettingsActivity : AppCompatActivity(){
                 val user = userDao.getUserById(userId)
                 if (user != null) {
                     var update = false
-
-                    //Zmaina imienia
-                    if (newName.isNotEmpty() && newName != user.name) {
-                        userDao.updateUserName(userId, newName)
-                        update = true
-                    }
+                    val changedName = newName.takeIf { it.isNotEmpty() && it != user.name }
+                    val changedEmail = newEmail.takeIf { it.isNotEmpty() && it != user.username }
 
                     //Zmiana emaila (sprawdzenie czy nie istnieje)
-                    if (newEmail.isNotEmpty() && newEmail != user.username) {
+                    if (changedEmail != null) {
                         val existing = userDao.getUserByUsername(newEmail)
-                        if (existing == null) {
-                            userDao.updateUserEmail(userId, newEmail)
-                            update = true
-                        } else {
+                        if (existing != null) {
                             runOnUiThread {
                                 Toast.makeText(this@SettingsActivity, "Ten email jest już zajęty",
                                     Toast.LENGTH_SHORT).show()
@@ -262,16 +256,39 @@ class SettingsActivity : AppCompatActivity(){
                             }
                             return@launch
                         }
-                        if (oldPass == user.password) {
+                        val passwordChangeResult = AuthRepository.changePassword(oldPass, newPass)
+                        if (passwordChangeResult.isSuccess) {
                             userDao.updateUserPassword(userId, newPass)
                             update = true
                         } else {
                             withContext(Dispatchers.Main) {
-                                Toast.makeText(
-                                    this@SettingsActivity,
-                                    "Stare hasło niepoprawne",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(this@SettingsActivity, "Stare hasło jest niepoprawne lub nie udało się zmienić hasła.", Toast.LENGTH_LONG).show()
+                            }
+                            return@launch
+                        }
+                    }
+
+                    if (changedName != null || changedEmail != null) {
+                        val accountUpdateResult = AuthRepository.updateAccountData(
+                            newEmail = changedEmail,
+                            newName = changedName
+                        )
+
+                        if (accountUpdateResult.isSuccess) {
+                            if (changedName != null) {
+                                userDao.updateUserName(userId, changedName)
+                                update = true
+                            }
+                            if (changedEmail != null) {
+                                userDao.updateUserEmail(userId, changedEmail)
+                                update = true
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                val message = accountUpdateResult.exceptionOrNull()?.message
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: "Nie udało się zaktualizować danych konta w Supabase."
+                                Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_LONG).show()
                             }
                             return@launch
                         }

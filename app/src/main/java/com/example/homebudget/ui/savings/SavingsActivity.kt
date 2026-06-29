@@ -88,7 +88,7 @@ class SavingsActivity : AppCompatActivity() {
         // Pobranie userId z Intentu
         userId = Prefs.getUserId(this)
         if (userId == -1) {
-            Toast.makeText(this, "BĹ‚Ä…d: brak uĹĽytkownika", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Błąd: brak użytkownika", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -187,7 +187,7 @@ class SavingsActivity : AppCompatActivity() {
 
                 if (text.isBlank()) {
                     editText.setBackgroundResource(errorBorder)
-                    editText.error = "Podaj prawidĹ‚owÄ… kwotÄ™"
+                    editText.error = "Podaj prawidłową kwotę"
                     return@setOnFocusChangeListener
                 }
 
@@ -211,7 +211,7 @@ class SavingsActivity : AppCompatActivity() {
                     editText.error = null
                 } else {
                     editText.setBackgroundResource(errorBorder)
-                    editText.error = "Podaj prawidĹ‚owÄ… kwotÄ™"
+                    editText.error = "Podaj prawidłową kwotę"
                 }
             } else {
                 editText.setBackgroundResource(normalBorder)
@@ -306,13 +306,13 @@ class SavingsActivity : AppCompatActivity() {
 
         // Przycisk wyboru daty
         val buttonPickDate = Button(this)
-        buttonPickDate.text = "Wybierz datÄ™ zakoĹ„czenia (opcjonalnie)"
+        buttonPickDate.text = "Wybierz datę zakończenia (opcjonalnie)"
         layout.addView(buttonPickDate)
 
         buttonPickDate.setOnClickListener {
             showDatePicker { timestamp, formatted ->
                 selectedEndDate = timestamp
-                buttonPickDate.text = "Data zakoĹ„czenia: $formatted"
+                buttonPickDate.text = "Data zakończenia: $formatted"
             }
         }
 
@@ -483,26 +483,26 @@ class SavingsActivity : AppCompatActivity() {
         var endDate: Long? = goal.endDate
         if (goal.endDate != null) {
             val cal = Calendar.getInstance().apply { timeInMillis = goal.endDate }
-            buttonPickDate.text = "Data zakoĹ„czenia: ${cal.get(Calendar.DAY_OF_MONTH)}.${cal.get(Calendar.MONTH) + 1}.${cal.get(Calendar.YEAR)}"
+            buttonPickDate.text = "Data zakończenia: ${cal.get(Calendar.DAY_OF_MONTH)}.${cal.get(Calendar.MONTH) + 1}.${cal.get(Calendar.YEAR)}"
         } else {
-            buttonPickDate.text = "Wybierz datÄ™ zakoĹ„czenia (opcjonalnie)"
+            buttonPickDate.text = "Wybierz datę zakończenia (opcjonalnie)"
         }
         layout.addView(buttonPickDate)
 
         buttonPickDate.setOnClickListener {
             showDatePicker { timestamp, formatted ->
                 endDate = timestamp
-                buttonPickDate.text = "Data zakoĹ„czenia: $formatted"
+                buttonPickDate.text = "Data zakończenia: $formatted"
             }
         }
         val buttonRemoveDate = Button(this).apply {
-            text = "âťŚ UsuĹ„ termin"
+            text = "Usuń termin"
             visibility = if (goal.endDate != null) View.VISIBLE else View.GONE
         }
         layout.addView(buttonRemoveDate)
         buttonRemoveDate.setOnClickListener {
             endDate = null
-            buttonPickDate.text = "Wybierz datÄ™ zakoĹ„czenia (opcjonalnie)"
+            buttonPickDate.text = "Wybierz datę zakończenia (opcjonalnie)"
             buttonRemoveDate.visibility = View.GONE
         }
 
@@ -630,7 +630,7 @@ class SavingsActivity : AppCompatActivity() {
 
         // đźŞź Budujemy dialog
         AlertDialog.Builder(this)
-            .setTitle("Dodaj oszczÄ™dnoĹ›ci")
+            .setTitle("Dodaj oszczędności")
             .setView(layout)
             .setPositiveButton("Dodaj") { _, _ ->
                 val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
@@ -653,8 +653,8 @@ class SavingsActivity : AppCompatActivity() {
                         if (shouldSendNotification && Prefs.isNotificationsEnabled(this@SavingsActivity)) {
                             // Anuluj istniejÄ…ce przypomnienia, nie maja sensu gdy cel zrobiony
                             SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, goal.id)
-                            val title = "Cel osiÄ…gniÄ™ty!"
-                            val text = "Gratulacje! â€ž${goal.title}â€ť zostaĹ‚ w 100% zrealizowany. Cel: ${MoneyFormatter.formatWithCurrency(goal.targetAmount)} đźŽ‰"
+                            val title = "Cel osiągnięty!"
+                            val text = "Gratulacje! \"${goal.title}\" został w 100% zrealizowany. Cel: ${MoneyFormatter.formatWithCurrency(goal.targetAmount)}"
                             // Systemowe powiadomeinia
                             NotificationHelper.notifySavings(this@SavingsActivity, updatedGoal.id * 10000 + 999 /*unikalne ID*/, title, text)
                         }
@@ -751,7 +751,7 @@ class SavingsActivity : AppCompatActivity() {
                         loadGoals()
                     }
                 } else {
-                    Toast.makeText(this, "Podaj poprawnÄ… kwotÄ™", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Podaj poprawną kwotę", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Anuluj", null)
@@ -766,7 +766,7 @@ class SavingsActivity : AppCompatActivity() {
         }
         // đź§ľ Pole kwoty
         val inputAmount = EditText(this).apply {
-            hint = "Kwota do wypĹ‚aty"
+            hint = "Kwota do wypłaty"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
         layout.addView(inputAmount)
@@ -795,27 +795,27 @@ class SavingsActivity : AppCompatActivity() {
         }
         // đźŞź Budujemy dialog
         AlertDialog.Builder(this)
-            .setTitle("WypĹ‚aÄ‡ Ĺ›rodki")
+            .setTitle("Wypłacić środki")
             .setView(layout)
-            .setPositiveButton("WypĹ‚aÄ‡") { _, _ ->
+            .setPositiveButton("Wypłać") { _, _ ->
                 val amount = MoneyUtils.parseAmount(inputAmount.text.toString())
                 val selectedPerson = spinner.selectedItem.toString()
                 if (amount == null || amount <= 0) {
                     AlertDialog.Builder(this)
                         .setTitle("Niepoprawna kwota")
-                        .setMessage("Podaj kwotÄ™ wiÄ™kszÄ… od zera.")
+                        .setMessage("Podaj kwotę większą od zera.")
                         .setPositiveButton("OK", null)
                         .show()
                     return@setPositiveButton
                 }
                 if (amount > goal.savedAmount) {
                     AlertDialog.Builder(this)
-                        .setTitle("Brak Ĺ›rodkĂłw")
-                        .setMessage("Nie moĹĽesz wypĹ‚aciÄ‡ $amount zĹ‚. \n\n" +
-                                "DostÄ™pne Ĺ›rodki: ${MoneyFormatter.formatWithCurrency(goal.savedAmount)}")
+                        .setTitle("Brak środków")
+                        .setMessage("Nie możesz wypłacić $amount zł. \n\n" +
+                                "Dostępne środki: ${MoneyFormatter.formatWithCurrency(goal.savedAmount)}")
                         .setPositiveButton("OK", null)
                         .show()
-                    Toast.makeText(this,"Podaj poprawnÄ… kwotÄ™", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this,"Podaj poprawną kwotę", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
                 launchBlockingAction("Zapisywanie wypłaty...") {
@@ -955,13 +955,13 @@ class SavingsActivity : AppCompatActivity() {
             val grouped = contributions.groupBy { it.personName }
             val summary = grouped.entries.joinToString("\n") { (person, list) ->
                 val sum = list.sumOf { it.amount }
-                "â€˘ $person: ${MoneyFormatter.formatWithCurrency(abs(sum))}"
+                "• $person: ${MoneyFormatter.formatWithCurrency(abs(sum))}"
             }
             runOnUiThread {
                 if (contributions.isEmpty()) {
                     AlertDialog.Builder(this@SavingsActivity)
-                        .setTitle("Historia wpĹ‚at")
-                        .setMessage("Brak wpĹ‚at dla tego celu.")
+                        .setTitle("Historia wpłat")
+                        .setMessage("Brak wpłat dla tego celu.")
                         .setPositiveButton("OK", null)
                         .show()
                 } else {
@@ -977,7 +977,7 @@ class SavingsActivity : AppCompatActivity() {
                     }
                     // Podsumowanie
                     val summaryTitle = TextView(this@SavingsActivity).apply {
-                        text = "đź“Š PODSUMOWANIE:"
+                        text = "Podsumowanie:"
                         textSize = 15f
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -1005,7 +1005,7 @@ class SavingsActivity : AppCompatActivity() {
                     }
                     // Separator
                     val separator = TextView(this@SavingsActivity).apply {
-                        text = "â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€"
+                        text = "--------------"
                         setTextColor(getColor(android.R.color.darker_gray))
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -1013,7 +1013,7 @@ class SavingsActivity : AppCompatActivity() {
                     }
                     // Historia
                     val historyTitle = TextView(this@SavingsActivity).apply {
-                        text = "đź“ś HISTORIA:"
+                        text = "Historia:"
                         textSize = 15f
                         gravity = Gravity.CENTER
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -1045,7 +1045,7 @@ class SavingsActivity : AppCompatActivity() {
                     container.addView(historyTitle)
                     container.addView(historyText)
                     AlertDialog.Builder(this@SavingsActivity)
-                        .setTitle("Historia wpĹ‚at - ${goal.title}")
+                        .setTitle("Historia wpłat - ${goal.title}")
                         .setView(container)
                         .setPositiveButton("OK", null)
                         .show()
@@ -1064,8 +1064,8 @@ class SavingsActivity : AppCompatActivity() {
             runOnUiThread {
                 if (contributions.isEmpty()) {
                     AlertDialog.Builder(this@SavingsActivity)
-                        .setTitle("Historia wpĹ‚at")
-                        .setMessage("Brak wpĹ‚at dla tego celu.")
+                        .setTitle("Historia wpłat")
+                        .setMessage("Brak wpłat dla tego celu.")
                         .setPositiveButton("OK", null)
                         .show()
                     return@runOnUiThread
@@ -1147,7 +1147,7 @@ class SavingsActivity : AppCompatActivity() {
                         .format(Date(contribution.timestamp))
                     val sign = if (contribution.amount < 0) "-" else "+"
                     val historyRow = TextView(this@SavingsActivity).apply {
-                        text = "${contribution.personName}: $sign${MoneyFormatter.formatWithCurrency(abs(contribution.amount))} â€˘ $date"
+                        text = "${contribution.personName}: $sign${MoneyFormatter.formatWithCurrency(abs(contribution.amount))} • $date"
                         textSize = 14f
                         setTextColor(if (contribution.amount < 0) negativeColor else positiveColor)
                         setPadding(0, 2.dp(), 0, 2.dp())
@@ -1162,7 +1162,7 @@ class SavingsActivity : AppCompatActivity() {
                 }
 
                 AlertDialog.Builder(this@SavingsActivity)
-                    .setTitle("Historia wpĹ‚at - ${goal.title}")
+                    .setTitle("Historia wpłat - ${goal.title}")
                     .setView(scrollView)
                     .setPositiveButton("OK", null)
                     .show()
@@ -1173,8 +1173,8 @@ class SavingsActivity : AppCompatActivity() {
     // Usuwanie celu
     private fun deleteGoal(goal: SavingsGoal) {
         AlertDialog.Builder(this)
-            .setTitle("UsuĹ„ cel")
-            .setMessage("Czy na pewno chcesz usunÄ…Ä‡ cel \"${goal.title}\"?")
+            .setTitle("Usuń cel")
+            .setMessage("Czy na pewno chcesz usunąć cel \"${goal.title}\"?")
             .setPositiveButton("Tak") { _, _ ->
                 // Najpierw anuluj wszystkie alarmy dla tego celu
                 SavingsGoalAlarmScheduler.cancelAllReminders(this@SavingsActivity, goal.id)

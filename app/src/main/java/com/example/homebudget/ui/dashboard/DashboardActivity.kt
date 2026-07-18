@@ -52,6 +52,7 @@ import com.example.homebudget.notifications.scheduler.DashboardBudgetAlarmSchedu
 import com.example.homebudget.ui.common.loading.LoadingOverlayController
 import com.example.homebudget.utils.color.ColorUtils
 import com.example.homebudget.utils.money.MoneyFormatter
+import com.example.homebudget.utils.money.MoneyUtils
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
 import com.example.homebudget.utils.settings.ThemeHelper
@@ -77,6 +78,12 @@ class DashboardActivity : AppCompatActivity() {
     companion object {
         private const val MIN_SLICE_LABEL_PERCENT = 8.0
     }
+
+    private data class BudgetCarryoverInfo(
+        val sourceBudget: MonthlyBudget,
+        val deltaAmount: Double,
+        val adjustedBudgetAmount: Double
+    )
 
     private var userId: Int = -1
     private var firstLoadDone = false
@@ -529,17 +536,31 @@ class DashboardActivity : AppCompatActivity() {
 
             // Sprawdzamy, czy wybrany miesiac jest w przyszłości
             val today = LocalDate.now()
-            val isFutureMonth = selectedYear > today.year || (selectedYear == today.year && selectedMonth > today.monthValue)
-            if (currentMonthBudgetEntity == null && isFutureMonth) {
-                val defaultBudget = withContext(Dispatchers.IO) {
-                    monthlyBudgetDao.getAllBudgetsForUser(userId).firstOrNull { it.isDefault }
+            val isCurrentOrFutureMonth =
+                selectedYear > today.year || (selectedYear == today.year && selectedMonth >= today.monthValue)
+            if (currentMonthBudgetEntity == null && isCurrentOrFutureMonth) {
+                val targetDate = LocalDate.of(selectedYear, selectedMonth, 1)
+                val previousDate = targetDate.minusMonths(1)
+                val previousMonthBudget = withContext(Dispatchers.IO) {
+                    monthlyBudgetDao.getBudgetForMonth(userId, previousDate.year, previousDate.monthValue)
                 }
-                if (defaultBudget != null) {
-                    var newBudget = defaultBudget.copy(
+                val carryoverInfo = withContext(Dispatchers.IO) {
+                    getBudgetCarryoverInfo(monthlyBudgetDao, expenseDao, selectedYear, selectedMonth)
+                }
+                val repeatingSourceBudget = when {
+                    carryoverInfo != null -> carryoverInfo.sourceBudget
+                    previousMonthBudget == null -> withContext(Dispatchers.IO) {
+                        getLatestRepeatingBudgetBefore(monthlyBudgetDao, selectedYear, selectedMonth)
+                    }
+                    else -> null
+                }
+                if (repeatingSourceBudget != null) {
+                    var newBudget = repeatingSourceBudget.copy(
                         id = 0,
                         year = selectedYear,
                         month = selectedMonth,
-                        isDefault = false
+                        budget = carryoverInfo?.adjustedBudgetAmount ?: repeatingSourceBudget.budget,
+                        isDefault = repeatingSourceBudget.isDefault
                     )
                     val insertedId = withContext(Dispatchers.IO) {
                         monthlyBudgetDao.insertBudget(newBudget).toInt()
@@ -708,6 +729,77 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
+    private fun getMonthRangeMillis(year: Int, month: Int): Pair<Long, Long> {
+        val startCalendar = Calendar.getInstance().apply {
+            set(year, month - 1, 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val endCalendar = Calendar.getInstance().apply {
+            set(year, month - 1, getActualMaximum(Calendar.DAY_OF_MONTH), 23, 59, 59)
+            set(Calendar.MILLISECOND, 999)
+        }
+        return startCalendar.timeInMillis to endCalendar.timeInMillis
+    }
+
+    private suspend fun getBudgetCarryoverInfo(
+        monthlyBudgetDao: com.example.homebudget.data.dao.MonthlyBudgetDao,
+        expenseDao: com.example.homebudget.data.dao.ExpenseDao,
+        targetYear: Int,
+        targetMonth: Int
+    ): BudgetCarryoverInfo? {
+        val targetDate = LocalDate.of(targetYear, targetMonth, 1)
+        val previousDate = targetDate.minusMonths(1)
+        val previousBudget = monthlyBudgetDao.getBudgetForMonth(
+            userId,
+            previousDate.year,
+            previousDate.monthValue
+        ) ?: return null
+
+        if (!previousBudget.isDefault) return null
+
+        val (startMillis, endMillis) = getMonthRangeMillis(previousDate.year, previousDate.monthValue)
+        val previousSpent = expenseDao
+            .getSumByCategoryForPeriod(userId, startMillis, endMillis)
+            .sumOf { it.total ?: 0.0 }
+
+        val deltaAmount = previousBudget.budget - previousSpent
+        val adjustedBudgetAmount = maxOf(0.0, previousBudget.budget + deltaAmount)
+
+        return BudgetCarryoverInfo(
+            sourceBudget = previousBudget,
+            deltaAmount = deltaAmount,
+            adjustedBudgetAmount = adjustedBudgetAmount
+        )
+    }
+
+    private suspend fun getLatestRepeatingBudgetBefore(
+        monthlyBudgetDao: com.example.homebudget.data.dao.MonthlyBudgetDao,
+        targetYear: Int,
+        targetMonth: Int
+    ): MonthlyBudget? {
+        val targetDate = LocalDate.of(targetYear, targetMonth, 1)
+        return monthlyBudgetDao.getAllBudgetsForUser(userId)
+            .filter { it.isDefault && LocalDate.of(it.year, it.month, 1).isBefore(targetDate) }
+            .maxByOrNull { it.year * 100 + it.month }
+    }
+
+    private fun buildCarryoverMessage(info: BudgetCarryoverInfo): String {
+        val summaryLine = when {
+            info.deltaAmount > 0.009 -> {
+                "Zaoszczędziłeś z poprzedniego miesiąca: " +
+                    MoneyFormatter.formatWithCurrency(info.deltaAmount)
+            }
+            info.deltaAmount < -0.009 -> {
+                "Przekroczyłeś budżet w poprzednim miesiącu o: " +
+                    MoneyFormatter.formatWithCurrency(kotlin.math.abs(info.deltaAmount))
+            }
+            else -> "Budżet z poprzedniego miesiąca został wykorzystany w całości."
+        }
+
+        return summaryLine + "\nNowy budżet po rozliczeniu: " +
+            MoneyFormatter.formatWithCurrency(info.adjustedBudgetAmount)
+    }
+
     private fun showSetBudgetDialog() {
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
@@ -721,16 +813,64 @@ class DashboardActivity : AppCompatActivity() {
         checkBox.text = "Powtarzaj co miesiąc"
         layout.addView(checkBox)
 
+        val carryoverInfoText = TextView(this).apply {
+            visibility = View.GONE
+            textSize = 14f
+            setPadding(0, 8, 0, 0)
+        }
+        layout.addView(carryoverInfoText)
+
+        var currentCarryoverInfo: BudgetCarryoverInfo? = null
+        var hasExistingBudget = false
+
+        fun updateCarryoverPreview(autofillAmount: Boolean) {
+            val carryoverInfo = currentCarryoverInfo
+            if (!checkBox.isChecked || carryoverInfo == null) {
+                carryoverInfoText.visibility = View.GONE
+                return
+            }
+
+            carryoverInfoText.text = buildCarryoverMessage(carryoverInfo)
+            carryoverInfoText.setTextColor(
+                when {
+                    carryoverInfo.deltaAmount > 0.009 -> Color.parseColor("#2E7D32")
+                    carryoverInfo.deltaAmount < -0.009 -> Color.parseColor("#C62828")
+                    else -> Color.parseColor("#555555")
+                }
+            )
+            carryoverInfoText.visibility = View.VISIBLE
+
+            if (autofillAmount && !hasExistingBudget) {
+                editText.setText(MoneyFormatter.format(carryoverInfo.adjustedBudgetAmount))
+                editText.setSelection(editText.text.length)
+            }
+        }
+
+        checkBox.setOnCheckedChangeListener { _, isChecked ->
+            updateCarryoverPreview(autofillAmount = isChecked)
+        }
+
         lifecycleScope.launch {
             val db = AppDatabase.Companion.getDatabase(this@DashboardActivity)
             val monthlyBudgetDao = db.monthlyBudgetDao()
+            val expenseDao = db.expenseDao()
 
             val currentBudget = withContext(Dispatchers.IO) {
                 monthlyBudgetDao.getBudgetForMonth(userId, selectedYear, selectedMonth)
             }
+            val carryoverInfo = withContext(Dispatchers.IO) {
+                getBudgetCarryoverInfo(monthlyBudgetDao, expenseDao, selectedYear, selectedMonth)
+            }
             if (currentBudget != null) {
-                editText.setText(currentBudget.budget.toString())
+                hasExistingBudget = true
+                editText.setText(MoneyFormatter.format(currentBudget.budget))
+                currentCarryoverInfo = carryoverInfo
                 checkBox.isChecked = currentBudget.isDefault
+                updateCarryoverPreview(autofillAmount = false)
+            } else if (carryoverInfo != null) {
+                currentCarryoverInfo = carryoverInfo
+                checkBox.isChecked = true
+                updateCarryoverPreview(autofillAmount = true)
             }
         }
 
@@ -743,7 +883,7 @@ class DashboardActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                val newBudget = editText.text.toString().toDoubleOrNull()
+                val newBudget = MoneyUtils.parseAmount(editText.text.toString())
                 val repeat = checkBox.isChecked
                 if (newBudget != null) {
                     lifecycleScope.launch(Dispatchers.IO) {

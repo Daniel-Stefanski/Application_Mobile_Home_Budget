@@ -49,6 +49,7 @@ import com.example.homebudget.notifications.scheduler.SavingsGoalAlarmScheduler
 import com.example.homebudget.ui.auth.LoginActivity
 import com.example.homebudget.ui.dashboard.DashboardActivity
 import com.example.homebudget.utils.color.ColorPalette
+import com.example.homebudget.utils.security.PasswordSecurity
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.SettingsHelper
 import com.example.homebudget.work.worker.WorkSchedulerSupabase
@@ -258,7 +259,12 @@ class SettingsActivity : AppCompatActivity(){
                         }
                         val passwordChangeResult = AuthRepository.changePassword(oldPass, newPass)
                         if (passwordChangeResult.isSuccess) {
-                            userDao.updateUserPassword(userId, newPass)
+                            val credentials = PasswordSecurity.createCredentials(newPass)
+                            userDao.updateUserPasswordCredentials(
+                                userId,
+                                credentials.hash,
+                                credentials.salt
+                            )
                             update = true
                         } else {
                             withContext(Dispatchers.Main) {
@@ -303,7 +309,7 @@ class SettingsActivity : AppCompatActivity(){
                         }
                     } else {
                         runOnUiThread {
-                            Toast.makeText(this@SettingsActivity, "Brak zmian do zpaisania", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@SettingsActivity, "Brak zmian do zapisania", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -1366,3 +1372,6 @@ class SettingsActivity : AppCompatActivity(){
         return regex.matches(password)
     }
 }
+
+
+

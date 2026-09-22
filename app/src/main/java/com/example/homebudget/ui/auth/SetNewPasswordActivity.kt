@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.auth
+﻿package com.example.homebudget.ui.auth
 
 import android.content.Intent
 import android.os.Bundle
@@ -17,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.homebudget.R
 import com.example.homebudget.data.database.AppDatabase
 import com.example.homebudget.ui.common.loading.LoadingDialogController
+import com.example.homebudget.utils.security.PasswordSecurity
 import com.example.homebudget.utils.settings.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -57,11 +58,11 @@ class SetNewPasswordActivity : AppCompatActivity() {
                 .setTitle("Wymagania hasła")
                 .setMessage(
                     """
-                    • minimum 8 znaków
-                    • co najmniej 1 mała litera
-                    • co najmniej 1 duża litera
-                    • co najmniej 1 cyfra
-                    • co najmniej 1 znak specjalny
+                    - minimum 8 znaków
+                    - co najmniej 1 mała litera
+                    - co najmniej 1 duża litera
+                    - co najmniej 1 cyfra
+                    - co najmniej 1 znak specjalny
                     """.trimIndent()
                 )
                 .setPositiveButton("OK", null)
@@ -84,8 +85,10 @@ class SetNewPasswordActivity : AppCompatActivity() {
                 editTextNewPassword.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 editTextConfirmPassword.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
             } else {
-                editTextNewPassword.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-                editTextConfirmPassword.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                editTextNewPassword.inputType =
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                editTextConfirmPassword.inputType =
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
 
             editTextNewPassword.setSelection(editTextNewPassword.text.length)
@@ -106,7 +109,9 @@ class SetNewPasswordActivity : AppCompatActivity() {
 
             if (newPassword.isEmpty() || confirmPassword.isEmpty()) {
                 if (newPassword.isEmpty()) showFieldError(editTextNewPassword, "Wpisz nowe hasło")
-                if (confirmPassword.isEmpty()) showFieldError(editTextConfirmPassword, "Powtórz hasło")
+                if (confirmPassword.isEmpty()) {
+                    showFieldError(editTextConfirmPassword, "Powtórz hasło")
+                }
                 Toast.makeText(this, "Wypełnij wszystkie pola", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -166,7 +171,7 @@ class SetNewPasswordActivity : AppCompatActivity() {
                             ?: "Nie udało się zmienić hasła."
                     }
                     Pair(responseCode, responseText)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     null
                 }
             }
@@ -194,7 +199,6 @@ class SetNewPasswordActivity : AppCompatActivity() {
     }
 
     private fun onPasswordChangedSuccessfully() {
-        // Po zmianie hasła czyścimy lokalną sesję.
         Prefs.clearPendingPasswordResetEmail(this)
         Prefs.clearSession(this)
 
@@ -240,9 +244,11 @@ class SetNewPasswordActivity : AppCompatActivity() {
             ?: return
 
         withContext(Dispatchers.IO) {
+            val credentials = PasswordSecurity.createCredentials(newPassword)
             AppDatabase.getDatabase(this@SetNewPasswordActivity)
                 .userDao()
-                .updatePassword(email, newPassword)
+                .updatePasswordCredentials(email, credentials.hash, credentials.salt)
         }
     }
 }
+

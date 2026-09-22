@@ -1,4 +1,4 @@
-package com.example.homebudget.ui.auth
+﻿package com.example.homebudget.ui.auth
 
 import android.Manifest
 import android.content.Context
@@ -29,6 +29,7 @@ import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.notifications.NotificationHelper
 import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.ui.dashboard.DashboardActivity
+import com.example.homebudget.utils.security.PasswordSecurity
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.ThemeHelper
 import com.example.homebudget.work.scheduler.WorkScheduler
@@ -87,8 +88,19 @@ class LoginActivity : AppCompatActivity() {
         checkBoxShowPassword = findViewById(R.id.checkboxShowPassword)
 
         val clearLoginErrorWatcher = object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun beforeTextChanged(
+                s: CharSequence?,
+                start: Int,
+                count: Int,
+                after: Int
+            ) = Unit
+
+            override fun onTextChanged(
+                s: CharSequence?,
+                start: Int,
+                before: Int,
+                count: Int
+            ) = Unit
 
             override fun afterTextChanged(s: Editable?) {
                 if (textLoginError.visibility == View.VISIBLE) {
@@ -135,7 +147,7 @@ class LoginActivity : AppCompatActivity() {
 
                     val result = AuthRepository.signIn(email, password)
                     if (result.isFailure) {
-                        if (offlineMode && localUser?.password == password) {
+                        if (offlineMode && localUser != null && verifyOfflinePassword(localUser, password)) {
                             finishLogin(localUser.id, checkBoxRememberMe.isChecked, offline = true)
                             return@launch
                         }
@@ -147,7 +159,7 @@ class LoginActivity : AppCompatActivity() {
                                 if (offlineMode) {
                                     "Brak internetu i brak poprawnych danych lokalnych do logowania"
                                 } else {
-                                    "Nieprawidlowy email lub haslo"
+                                    "Nieprawidłowy email lub hasło"
                                 },
                                 Toast.LENGTH_SHORT
                             ).show()
@@ -161,9 +173,11 @@ class LoginActivity : AppCompatActivity() {
 
                     val userId = if (localUser == null) {
                         val now = System.currentTimeMillis()
+                        val credentials = PasswordSecurity.createCredentials(password)
                         val newUser = User(
                             username = email,
-                            password = password,
+                            passwordHash = credentials.hash,
+                            passwordSalt = credentials.salt,
                             name = "",
                             createdAt = now,
                             lastLogin = now
@@ -172,8 +186,13 @@ class LoginActivity : AppCompatActivity() {
                             userDao.insertUser(newUser).toInt()
                         }
                     } else {
+                        val credentials = PasswordSecurity.createCredentials(password)
                         withContext(Dispatchers.IO) {
-                            userDao.updatePassword(email, password)
+                            userDao.updatePasswordCredentials(
+                                email,
+                                credentials.hash,
+                                credentials.salt
+                            )
                             userDao.updateLastLogin(localUser.id, System.currentTimeMillis())
                         }
                         localUser.id
@@ -210,6 +229,28 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    private suspend fun verifyOfflinePassword(localUser: User, password: String): Boolean {
+        if (localUser.passwordSalt.isNotBlank()) {
+            return PasswordSecurity.verify(
+                password,
+                localUser.passwordHash,
+                localUser.passwordSalt
+            )
+        }
+
+        if (localUser.passwordHash != password) return false
+
+        val credentials = PasswordSecurity.createCredentials(password)
+        withContext(Dispatchers.IO) {
+            userDao.updateUserPasswordCredentials(
+                localUser.id,
+                credentials.hash,
+                credentials.salt
+            )
+        }
+        return true
+    }
+
     private fun restoreSupabaseUidFromSession() {
         AuthRepository.getCurrentUser()?.id?.let { uid ->
             Prefs.setSupabaseUid(this, uid)
@@ -226,7 +267,8 @@ class LoginActivity : AppCompatActivity() {
 
     private fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(
+        if (
+            ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
@@ -248,3 +290,4 @@ class LoginActivity : AppCompatActivity() {
         editTextPassword.setBackgroundResource(R.drawable.shape_search_border)
     }
 }
+

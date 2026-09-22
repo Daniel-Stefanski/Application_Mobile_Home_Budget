@@ -1,10 +1,11 @@
-package com.example.homebudget.notifications.scheduler
+﻿package com.example.homebudget.notifications.scheduler
 
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.example.homebudget.data.entity.SavingsGoal
 import com.example.homebudget.notifications.receiver.SavingsGoalNotificationReceiver
 import com.example.homebudget.utils.settings.Prefs
@@ -102,3 +103,4 @@ object SavingsGoalAlarmScheduler {
         return cal.timeInMillis
     }
 }
+

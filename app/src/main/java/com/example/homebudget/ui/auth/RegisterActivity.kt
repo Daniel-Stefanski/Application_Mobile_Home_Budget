@@ -16,9 +16,9 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -31,6 +31,7 @@ import com.example.homebudget.data.entity.User
 import com.example.homebudget.data.remote.AuthRepository
 import com.example.homebudget.ui.common.loading.LoadingDialogController
 import com.example.homebudget.ui.dashboard.DashboardActivity
+import com.example.homebudget.utils.security.PasswordSecurity
 import com.example.homebudget.utils.settings.Prefs
 import com.example.homebudget.utils.settings.ThemeHelper
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +39,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
-// RegisterActivity.kt - ekran rejestracji nowego uzytkownika.
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var nameField: EditText
@@ -48,11 +48,17 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var checkboxShowPassword: CheckBox
     private lateinit var checkboxTerms: CheckBox
     private lateinit var registerButton: Button
-    private lateinit var progressBar: ProgressBar
     private lateinit var loginText: TextView
-    private lateinit var textReadTerms: TextView
     private lateinit var textTermsError: TextView
     private lateinit var loadingDialog: LoadingDialogController
+
+    private val termsActivityLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                checkboxTerms.isChecked = true
+                Toast.makeText(this, "Regulamin został zaakceptowany", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_NO
@@ -66,33 +72,33 @@ class RegisterActivity : AppCompatActivity() {
         checkboxShowPassword = findViewById(R.id.checkboxShowPassword)
         checkboxTerms = findViewById(R.id.checkBoxTerms)
         registerButton = findViewById(R.id.buttonRegister)
-        progressBar = findViewById(R.id.progressBar)
-        progressBar.visibility = View.GONE
         loadingDialog = LoadingDialogController(this)
         loginText = findViewById(R.id.textLogin)
+        textTermsError = findViewById(R.id.textTermsError)
+
         findViewById<View>(R.id.imagePasswordInfo).setOnClickListener {
             AlertDialog.Builder(this)
-                .setTitle("Wymagania hasla")
+                .setTitle("Wymagania hasła")
                 .setMessage(
                     """
-                    • minimum 8 znakow
-                    • co najmniej 1 mala litera
-                    • co najmniej 1 duza litera
-                    • co najmniej 1 cyfra
-                    • co najmniej 1 znak specjalny
+                    - minimum 8 znaków
+                    - co najmniej 1 mała litera
+                    - co najmniej 1 duża litera
+                    - co najmniej 1 cyfra
+                    - co najmniej 1 znak specjalny
                     """.trimIndent()
                 )
                 .setPositiveButton("OK", null)
                 .show()
         }
 
-        val termsText = "Akceptuje Regulamin"
+        val termsText = "Akceptuję Regulamin"
         val spannable = SpannableString(termsText)
 
         val clickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
                 val intent = Intent(this@RegisterActivity, TermsActivity::class.java)
-                startActivityForResult(intent, 1001)
+                termsActivityLauncher.launch(intent)
             }
 
             override fun updateDrawState(ds: TextPaint) {
@@ -102,21 +108,35 @@ class RegisterActivity : AppCompatActivity() {
             }
         }
 
-        spannable.setSpan(clickableSpan, 10, termsText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(
+            clickableSpan,
+            10,
+            termsText.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
 
         checkboxTerms.text = spannable
         checkboxTerms.movementMethod = LinkMovementMethod.getInstance()
         checkboxTerms.highlightColor = Color.TRANSPARENT
-
-        textTermsError = findViewById(R.id.textTermsError)
 
         val db = AppDatabase.getDatabase(this)
         val userDao = db.userDao()
         val settingsDao = db.settingsDao()
 
         emailField.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun beforeTextChanged(
+                s: CharSequence?,
+                start: Int,
+                count: Int,
+                after: Int
+            ) = Unit
+
+            override fun onTextChanged(
+                s: CharSequence?,
+                start: Int,
+                before: Int,
+                count: Int
+            ) = Unit
 
             override fun afterTextChanged(s: Editable?) {
                 if (emailField.error != null) {
@@ -130,8 +150,10 @@ class RegisterActivity : AppCompatActivity() {
                 passwordField.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 confirmPasswordField.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
             } else {
-                passwordField.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-                confirmPasswordField.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                passwordField.inputType =
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                confirmPasswordField.inputType =
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
             passwordField.setSelection(passwordField.text.length)
             confirmPasswordField.setSelection(confirmPasswordField.text.length)
@@ -159,11 +181,11 @@ class RegisterActivity : AppCompatActivity() {
                 isValid = false
             }
             if (password.isEmpty()) {
-                showFieldError(passwordField, "Wpisz haslo")
+                showFieldError(passwordField, "Wpisz hasło")
                 isValid = false
             }
             if (password != confirmPassword) {
-                showFieldError(confirmPasswordField, "Hasla sie nie zgadzaja")
+                showFieldError(confirmPasswordField, "Hasła się nie zgadzają")
                 isValid = false
             }
             if (!acceptedTerms) {
@@ -177,7 +199,7 @@ class RegisterActivity : AppCompatActivity() {
             }
 
             if (!isPasswordValid(password)) {
-                showFieldError(passwordField, "Haslo nie spelnia wymagan!")
+                showFieldError(passwordField, "Hasło nie spełnia wymagań!")
                 isValid = false
             }
             if (!isValid) return@setOnClickListener
@@ -193,7 +215,7 @@ class RegisterActivity : AppCompatActivity() {
                     if (existingUser != null) {
                         runOnUiThread {
                             registerButton.isEnabled = true
-                            showEmailError("Email juz istnieje")
+                            showEmailError("Email już istnieje")
                         }
                     } else {
                         val supaResult = AuthRepository.signUp(email, password)
@@ -203,7 +225,7 @@ class RegisterActivity : AppCompatActivity() {
                             withContext(Dispatchers.Main) {
                                 registerButton.isEnabled = true
                                 if (isEmailAlreadyRegisteredError(exception)) {
-                                    showEmailError("Email juz istnieje")
+                                    showEmailError("Email już istnieje")
                                 } else {
                                     Toast.makeText(
                                         this@RegisterActivity,
@@ -224,11 +246,13 @@ class RegisterActivity : AppCompatActivity() {
 
                         val currentTime = System.currentTimeMillis()
                         val safeName = name.trim().take(20)
+                        val credentials = PasswordSecurity.createCredentials(password)
                         val newUser = User(
                             id = 0,
                             name = safeName,
                             username = email,
-                            password = password,
+                            passwordHash = credentials.hash,
+                            passwordSalt = credentials.salt,
                             createdAt = currentTime,
                             lastLogin = currentTime
                         )
@@ -247,7 +271,7 @@ class RegisterActivity : AppCompatActivity() {
                             userId = userId,
                             categories = "[\"Jedzenie\",\"Transport\",\"Rachunki\",\"Rozrywka\",\"Inne\"]",
                             currency = "PLN",
-                            period = "Miesieczny",
+                            period = "Miesięczny",
                             savingsGoal = 0.0
                         )
                         withContext(Dispatchers.IO) {
@@ -272,7 +296,11 @@ class RegisterActivity : AppCompatActivity() {
 
                         runOnUiThread {
                             registerButton.isEnabled = true
-                            Toast.makeText(this@RegisterActivity, "Konto utworzone", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                this@RegisterActivity,
+                                "Konto utworzone",
+                                Toast.LENGTH_SHORT
+                            ).show()
 
                             val intent = Intent(this@RegisterActivity, DashboardActivity::class.java)
                             startActivity(intent)
@@ -343,17 +371,5 @@ class RegisterActivity : AppCompatActivity() {
             message.contains("email address already registered") ||
             message.contains("user already registered") ||
             message.contains("duplicate key")
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == 1001) {
-            if (resultCode == RESULT_OK) {
-                checkboxTerms.isChecked = true
-                Toast.makeText(this, "Regulamin zostal zaakceptowany", Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 }

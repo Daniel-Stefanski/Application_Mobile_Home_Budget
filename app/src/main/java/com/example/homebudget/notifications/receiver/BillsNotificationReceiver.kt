@@ -41,9 +41,9 @@ class BillsNotificationReceiver : BroadcastReceiver() {
                 val amountStr = String.format(LocaleUtils.POLISH, "%.2f", expense.amount)
                 val billName = expense.description?.takeIf { it.isNotBlank() } ?: "Rachunek"
                 val text = if (isOverdueReminder) {
-                    "$billName • $amountStr zl • Termin płatności: $dateStr. Opłać rachunek i oznacz go jako opłacony."
+                    "$billName • $amountStr zł • Termin płatności: $dateStr. Opłać rachunek i oznacz go jako opłacony."
                 } else {
-                    "$billName • $amountStr zl • Termin płatności: $dateStr"
+                    "$billName • $amountStr zł • Termin płatności: $dateStr"
                 }
 
                 NotificationHelper.createNotificationChannel(context)

@@ -50,7 +50,7 @@ object SavingsGoalAlarmScheduler {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
             }
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            Log.w("SavingsGoalAlarmScheduler", "Nie udało się zaplanować przypomnienia celu oszczędnościowego.", e)
         }
     }
 

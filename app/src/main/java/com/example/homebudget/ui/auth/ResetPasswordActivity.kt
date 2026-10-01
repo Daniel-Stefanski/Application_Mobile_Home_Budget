@@ -118,7 +118,7 @@ class ResetPasswordActivity : AppCompatActivity() {
                     Prefs.setPendingPasswordResetEmail(this@ResetPasswordActivity, email)
                     showSuccessDialog()
                 } else {
-                    Toast.makeText(this@ResetPasswordActivity, "Nie udało się wysyłać zgłoszenie resetu. Sprawdź internet i spróbuj ponownie.",
+                    Toast.makeText(this@ResetPasswordActivity, "Nie udało się wysłać zgłoszenia resetu. Sprawdź internet i spróbuj ponownie.",
                         Toast.LENGTH_LONG).show()
                 }
             } finally {

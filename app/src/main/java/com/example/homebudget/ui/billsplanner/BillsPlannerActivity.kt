@@ -123,8 +123,8 @@ class BillsPlannerActivity : AppCompatActivity() {
 
     private fun deleteBill(expense: Expense) {
         AlertDialog.Builder(this)
-            .setTitle("Usun z planowania rachunkow")
-            .setMessage("Czy na pewno chcesz usunac ten rachunek z planowania?")
+            .setTitle("Usuń z planowania rachunków")
+            .setMessage("Czy na pewno chcesz usunąć ten rachunek z planowania?")
             .setPositiveButton("Tak") { _, _ ->
                 lifecycleScope.launch {
                     val db = AppDatabase.getDatabase(this@BillsPlannerActivity)
@@ -174,7 +174,7 @@ class BillsPlannerActivity : AppCompatActivity() {
                     }
                     WorkSchedulerSupabase.scheduleSupabaseSync(this@BillsPlannerActivity)
                     loadRecurringBills()
-                    Toast.makeText(this@BillsPlannerActivity, "Rachunek usuniety z planera", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@BillsPlannerActivity, "Rachunek usunięty z planera", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Anuluj", null)
@@ -246,7 +246,7 @@ class BillsPlannerActivity : AppCompatActivity() {
             }
 
             loadRecurringBills()
-            Toast.makeText(this@BillsPlannerActivity, "Status zamieniono na $newStatus.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@BillsPlannerActivity, "Status zmieniono na $newStatus.", Toast.LENGTH_SHORT).show()
         }
     }
 

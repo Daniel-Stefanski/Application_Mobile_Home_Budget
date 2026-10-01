@@ -66,7 +66,7 @@ object DashboardBudgetAlarmScheduler {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pi)
             }
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            Log.w("DashboardBudgetAlarmScheduler", "Nie udało się zaplanować codziennego sprawdzenia budżetu.", e)
         }
     }
 

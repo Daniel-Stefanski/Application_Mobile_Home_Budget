@@ -60,7 +60,7 @@ object BillsAlarmScheduler {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
             }
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            Log.w("BillsAlarmScheduler", "Nie udało się zaplanować przypomnienia rachunku.", e)
         }
     }
 
